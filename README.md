@@ -1,6 +1,7 @@
-# PAE Software
+# PAE
 
-Plataforma de apoyo académico para estudiantes de quinto de secundaria y preuniversitarios, con herramientas para docentes. Integra repositorios educativos, lecciones, banco de preguntas, simulacros, comunidades, planificación y gamificación educativa.
+La idea del software partió de un inicio mediante entrevistas hechas a alumnos, algunos docentes e incluso a la directora de la institución educativa "Amazonas (Tingo Maria)", con su apoyo y autorización, se pudo partir de una base de requisitos presentados a continuación. 
+La Plataforma de Apoyo Estudiantil (PAE) para estudiantes de quinto de secundaria y preuniversitarios, con herramientas para docentes. Integra repositorios educativos, lecciones, banco de preguntas, simulacros, comunidades, planificación y gamificación educativa.
 
 Este repositorio reúne el código disponible y la documentación de su estado real. Existe una base funcional amplia para desarrollo y demostración local. **La aceptación integral de todos los requisitos y la preparación para producción siguen pendientes.**
 
@@ -9,7 +10,7 @@ Este repositorio reúne el código disponible y la documentación de su estado r
 | Documento | Contenido |
 | --- | --- |
 | [Resumen ejecutivo](docs/RESUMEN_EJECUTIVO.md) | Objetivo, alcance, interesados, ocho módulos, flujo completo, avances y pendientes |
-| [Matriz de requisitos](docs/MATRIZ_REQUISITOS.md) | RQ01–RQ114, estado documental, evidencia del código y brechas |
+| [Matriz de requisitos](docs/MATRIZ_REQUISITOS.md) | RQ01–RQ114, estado documental, evidencia del código y brechas (Escalable según el equipo) |
 | [Historias de usuario](docs/HISTORIAS_USUARIO.md) | 78 secciones de historias o épicas y sus tablas de aceptación, distribuidas por módulo |
 | [Instalación local](docs/INSTALACION_LOCAL.md) | Preparación, arranque Docker, desarrollo, datos y solución de problemas |
 | [Configuración](docs/CONFIGURACION.md) | Variables, puertos, secretos, SonarQube y entornos |
