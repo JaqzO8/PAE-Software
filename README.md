@@ -1,6 +1,6 @@
 # PAE Software
 
-Plataforma de apoyo académico para estudiantes de quinto de secundaria y preuniversitarios, con herramientas para docentes. Integra repositorios educativos, lecciones, banco de preguntas, simulacros, comunidades, planificación y gamificación.
+Plataforma de apoyo académico para estudiantes de quinto de secundaria y preuniversitarios, con herramientas para docentes. Integra repositorios educativos, lecciones, banco de preguntas, simulacros, comunidades, planificación y gamificación educativa.
 
 Este repositorio reúne el código disponible y la documentación de su estado real. Existe una base funcional amplia para desarrollo y demostración local. **La aceptación integral de todos los requisitos y la preparación para producción siguen pendientes.**
 
@@ -41,27 +41,19 @@ La configuración inicial es de **desarrollo local**; los puertos publicados se 
 | --- | --- |
 | `main` | Entregas revisadas; rama predeterminada |
 | `develop` | Integración del equipo |
-| `José_Queshyac` | Trabajo de José |
+| `Jose_Queshyac` | Trabajo de José |
 | `Amelia_Mauricio` | Trabajo de Amelia |
 | `Richard_Estela` | Trabajo de Richard |
 | `Juan_Rengifo` | Trabajo de Juan |
 
-Las ramas personales nacen de la misma base que `develop`. Conserva exactamente el acento de `José_Queshyac` y los guiones bajos. La creación de una rama no concede acceso a GitHub: los colaboradores necesitan una invitación independiente del propietario.
+Las ramas personales nacen de la misma base que `develop`. Conserva exactamente el acento de `Jose_Queshyac` y los guiones bajos. La creación de una rama no concede acceso a GitHub: los colaboradores necesitan una invitación independiente del propietario.
 
 ## Publicación segura
-
-Se versionan fuentes, esquemas iniciales, pruebas con datos ficticios, archivos de bloqueo de dependencias y plantillas de configuración. `.env`, credenciales reales, dependencias instaladas, bases de datos, archivos cargados por usuarios, copias de seguridad y evidencias temporales quedan fuera de Git.
-
-```sh
-git add <archivos-revisados>
-node scripts/check-repository-safety.mjs --staged
-git diff --cached --stat
-```
 
 El repositorio empieza con un historial nuevo para no trasladar secretos o residuos de commits anteriores. La carpeta original y su remoto se conservan. No se publica automáticamente una aplicación al hacer push: GitHub Pages se ejecuta de forma manual y solo aloja el frontend.
 
 ## Estado de la entrega
 
-Los documentos nuevos usan como fuente principal el archivo «Documento de Especificacion de Requisitos de PAE..docx» y contrastan sus objetivos con el código disponible. Las auditorías anteriores se conservan como antecedentes y no sustituyen esta evaluación. Los términos «aprobado» o «completo» que aparecen en esos antecedentes no certifican aceptación ni seguridad de producción.
+Los documentos nuevos usan como fuente principal un archivo de "Documentación de Requisitos" y contrastan sus objetivos con el código disponible. Las auditorías anteriores se conservan como antecedentes y no sustituyen esta evaluación. Los términos «aprobado» o «completo» que aparecen en esos antecedentes no certifican aceptación ni seguridad de producción.
 
-El nombre del producto es **PAE Software**; el identificador del repositorio es `PAE-Software`. No se añade una licencia global nueva sin una decisión del equipo; las licencias de dependencias y los metadatos existentes de paquetes deben revisarse antes de distribuir el producto a terceros.
+El nombre del producto es **PAE (Plataforma de Apoyo Estudiantil)**; el identificador del repositorio es `PAE-Software`. No se añade una licencia global nueva sin una decisión del equipo; las licencias de dependencias y los metadatos existentes de paquetes deben revisarse antes de distribuir el producto a terceros.
