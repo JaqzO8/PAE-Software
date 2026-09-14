@@ -1,0 +1,35 @@
+LISTA HISTORICA NO ACTUALIZADA. Incluye rutas propuestas que no existen en esta versión. Consultar docs/ARQUITECTURA.md y los archivos de rutas de cada servicio.
+
+Auth Service (puerto 3001):
+POST    /register           # Registro con tipo_usuario
+POST    /login              # Login email/password
+POST    /google             # Login con Google (RQ58)
+POST    /refresh            # Refresh token
+POST    /logout             # Cerrar sesión (RQ107)
+POST    /logout-all         # Cerrar todas las sesiones (RQ107)
+POST    /forgot-password    # Recuperación (RQ96)
+POST    /reset-password     # Reset password
+POST    /verify-2fa         # Verificar 2FA (RQ95)
+POST    /enable-2fa         # Activar 2FA
+GET     /sessions           # Obtener sesiones activas (RQ101, RQ104)
+DELETE  /sessions/:id       # Cerrar sesión específica
+POST    /verify-token       # Para que user-service verifique tokens
+
+User Service (puerto 3002):
+GET     /profile            # Obtener perfil completo
+PUT     /profile            # Actualizar perfil (RQ100)
+GET     /profile/:id        # Obtener perfil por ID único (RQ02)
+POST    /profile/copy-id    # Copiar ID único al clipboard (RQ02)
+GET     /stats              # Estadísticas del usuario (RQ53, RQ76)
+GET     /progress           # Progreso por temas
+GET     /achievements       # Logros obtenidos (RQ70)
+GET     /recommendations    # Recomendaciones (RQ19, RQ41)
+GET     /calendar           # Eventos del calendario
+POST    /calendar           # Crear evento
+GET     /favorites          # Contenidos favoritos (RQ55)
+POST    /favorites/:id      # Añadir a favoritos
+DELETE  /favorites/:id      # Quitar de favoritos
+GET     /search?q=          # Buscar usuarios (RQ03)
+POST    /onboarding         # Completar onboarding (RQ99)
+GET     /activities         # Actividad reciente (RQ108)
+

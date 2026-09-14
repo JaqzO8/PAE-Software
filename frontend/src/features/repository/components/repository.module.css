@@ -1,0 +1,138 @@
+/* src/features/repository/components/repository.module.css - MEJORADO */
+
+/* Contenedor principal */
+.pageContainer {
+  @apply space-y-8 animate-in fade-in duration-500;
+}
+
+/* Contenedor de lista vertical */
+.gridContainer {
+  @apply flex flex-col gap-4;
+}
+
+/* --- DISEÑO DE TARJETA HORIZONTAL --- */
+
+.cardHorizontal {
+  @apply flex items-center p-5 gap-5 transition-all duration-300;
+  @apply hover:shadow-xl hover:scale-[1.02] border-neutral-200;
+  @apply bg-white rounded-xl cursor-pointer;
+  @apply relative overflow-hidden;
+}
+
+/* Borde lateral animado */
+.cardHorizontal::before {
+  content: '';
+  @apply absolute left-0 top-0 w-1 h-full bg-brand-action;
+  @apply transition-all duration-300 opacity-0;
+}
+
+.cardHorizontal:hover::before {
+  @apply opacity-100 w-2;
+}
+
+/* Contenedor del ícono */
+.iconContainer {
+  @apply flex-shrink-0 h-14 w-14 rounded-xl;
+  @apply flex items-center justify-center;
+  @apply transition-all duration-300;
+}
+
+.cardHorizontal:hover .iconContainer {
+  @apply scale-110;
+}
+
+/* Contenedor de texto */
+.contentContainer {
+  @apply flex-1 flex flex-col gap-2 overflow-hidden;
+}
+
+/* Título */
+.cardTitle {
+  @apply text-lg font-bold text-primary-contrast truncate;
+  @apply transition-colors duration-200;
+}
+
+.cardHorizontal:hover .cardTitle {
+  @apply text-brand-action;
+}
+
+/* Tags */
+.cardTags {
+  @apply text-sm text-muted-foreground truncate;
+  @apply flex items-center gap-2 flex-wrap;
+}
+
+/* Separador de tags */
+.tagSeparator {
+  @apply h-1 w-1 rounded-full bg-neutral-300;
+}
+
+/* Metadata */
+.cardMeta {
+  @apply text-xs text-muted-foreground;
+  @apply flex items-center gap-2 flex-wrap;
+}
+
+/* Contenedor de acciones */
+.actionContainer {
+  @apply flex-shrink-0 flex items-center gap-3 ml-4;
+}
+
+/* Botón principal (Ver) */
+.viewButton {
+  @apply text-white font-semibold px-8 rounded-xl h-11 text-sm;
+  @apply transition-all duration-300 shadow-md;
+  @apply hover:shadow-lg hover:scale-105;
+}
+
+/* Botón de eliminar */
+.deleteIconButton {
+  @apply text-red-500 hover:text-red-700 hover:bg-red-50;
+  @apply h-10 w-10 p-0 rounded-lg transition-all;
+}
+
+/* --- FORMULARIOS --- */
+
+.formContainer {
+  @apply max-w-3xl mx-auto space-y-6;
+}
+
+/* Dropzone de carga */
+.dropzone {
+  @apply border-2 border-dashed border-neutral-300 rounded-xl;
+  @apply p-12 text-center transition-all duration-300;
+  @apply hover:border-brand-action hover:bg-brand-action/5;
+  @apply cursor-pointer;
+}
+
+/* --- SEARCH CONTAINER --- */
+
+.searchContainer {
+  @apply relative w-full md:w-96;
+}
+
+/* --- HEADER SECTION --- */
+
+.headerSection {
+  @apply flex flex-col md:flex-row md:items-center md:justify-between gap-4;
+}
+
+/* --- RESPONSIVE --- */
+
+@media (max-width: 768px) {
+  .cardHorizontal {
+    @apply flex-col items-start p-4 gap-4;
+  }
+
+  .actionContainer {
+    @apply w-full ml-0;
+  }
+
+  .viewButton {
+    @apply w-full;
+  }
+
+  .iconContainer {
+    @apply h-12 w-12;
+  }
+}

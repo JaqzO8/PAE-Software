@@ -1,0 +1,419 @@
+services:
+  # ========================================
+  # FRONTEND (Vite / SPA)
+  # ========================================
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: ${VITE_API_URL:-/api}
+    container_name: pae-frontend
+    ports:
+      - "127.0.0.1:${FRONTEND_PORT}:5173"
+    depends_on:
+      - nginx-gateway
+    networks:
+      - pae-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:5173"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  # ========================================
+  # NGINX - API GATEWAY
+  # ========================================
+  nginx-gateway:
+    build: ./backend/nginx
+    container_name: pae-nginx-gateway
+    ports:
+      - "127.0.0.1:${NGINX_PORT}:3000"
+    depends_on:
+      - auth-service
+      - content-service
+      - community-service
+      - exam-service
+      - quality-service
+    networks:
+      - pae-network
+    restart: unless-stopped
+
+  # ========================================
+  # AUTH SERVICE
+  # ========================================
+  auth-service:
+    build: ./backend/services/auth-service
+    container_name: pae-auth-service
+    ports:
+      - "127.0.0.1:${AUTH_PORT}:3001"
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      UV_THREADPOOL_SIZE: 16
+      PORT: 3001
+      DB_HOST: ${AUTH_DB_HOST}
+      DB_PORT: ${AUTH_DB_PORT}
+      DB_NAME: ${AUTH_DB_NAME}
+      DB_USER: ${AUTH_DB_USER}
+      DB_PASSWORD: ${AUTH_DB_PASSWORD}
+      REDIS_URL: ${REDIS_URL}
+      FRONTEND_URL: ${FRONTEND_URL}
+      LOG_SQL: ${LOG_SQL:-false}
+      DB_POOL_MAX: ${AUTH_DB_POOL_MAX:-20}
+      DB_POOL_MIN: ${DB_POOL_MIN:-0}
+      DB_POOL_ACQUIRE_MS: ${DB_POOL_ACQUIRE_MS:-30000}
+      DB_POOL_IDLE_MS: ${DB_POOL_IDLE_MS:-10000}
+      AUTH_RATE_LIMIT_MAX: ${AUTH_RATE_LIMIT_MAX:-3000}
+      LOGIN_RATE_LIMIT_MAX: ${LOGIN_RATE_LIMIT_MAX:-20}
+      AUTH_PREFERENCES_CACHE_TTL_SECONDS: ${AUTH_PREFERENCES_CACHE_TTL_SECONDS:-120}
+    depends_on:
+      auth-db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - pae-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3001/api/auth/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ========================================
+  # CONTENT SERVICE
+  # ========================================
+  content-service:
+    build: ./backend/services/content-service
+    container_name: pae-content-service
+    ports:
+      - "127.0.0.1:${CONTENT_PORT}:3003"
+    volumes:
+      - ./uploads:/app/uploads
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      UV_THREADPOOL_SIZE: 16
+      PORT: 3003
+      DB_HOST: ${CONTENT_DB_HOST}
+      DB_PORT: ${CONTENT_DB_PORT}
+      DB_NAME: ${CONTENT_DB_NAME}
+      DB_USER: ${CONTENT_DB_USER}
+      DB_PASSWORD: ${CONTENT_DB_PASSWORD}
+      AUTH_SERVICE_URL: ${AUTH_SERVICE_URL}
+      FRONTEND_URL: ${FRONTEND_URL}
+      UPLOAD_PATH: /app/uploads
+      MAX_FILE_SIZE: ${MAX_FILE_SIZE}
+      LOG_SQL: ${LOG_SQL:-false}
+      DB_POOL_MAX: ${CONTENT_DB_POOL_MAX:-20}
+      DB_POOL_MIN: ${DB_POOL_MIN:-0}
+      DB_POOL_ACQUIRE_MS: ${DB_POOL_ACQUIRE_MS:-30000}
+      DB_POOL_IDLE_MS: ${DB_POOL_IDLE_MS:-10000}
+      CONTENT_RATE_LIMIT_MAX: ${CONTENT_RATE_LIMIT_MAX:-3000}
+    depends_on:
+      content-db:
+        condition: service_healthy
+    networks:
+      - pae-network
+    restart: unless-stopped
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
+    healthcheck: 
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3003/api/content/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ========================================
+  # COMMUNITY SERVICE
+  # ========================================
+  community-service:
+    build: ./backend/services/community-service
+    container_name: pae-community-service
+    ports:
+      - "127.0.0.1:${COMMUNITY_PORT}:3002"
+    volumes:
+      - ./uploads/community:/app/uploads
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      UV_THREADPOOL_SIZE: 16
+      PORT: 3002
+      DB_HOST: ${COMMUNITY_DB_HOST}
+      DB_PORT: ${COMMUNITY_DB_PORT}
+      DB_NAME: ${COMMUNITY_DB_NAME}
+      DB_USER: ${COMMUNITY_DB_USER}
+      DB_PASSWORD: ${COMMUNITY_DB_PASSWORD}
+      REDIS_URL: ${REDIS_URL}
+      AUTH_SERVICE_URL: ${AUTH_SERVICE_URL}
+      FRONTEND_URL: ${FRONTEND_URL}
+      UPLOAD_PATH: /app/uploads
+      MAX_FILE_SIZE: ${MAX_FILE_SIZE}
+      COMMUNITY_ALLOWED_FILE_TYPES: ${COMMUNITY_ALLOWED_FILE_TYPES:-application/pdf}
+      COMMUNITY_MESSAGE_RATE_LIMIT_MAX: ${COMMUNITY_MESSAGE_RATE_LIMIT_MAX:-12}
+      COMMUNITY_MESSAGE_RATE_LIMIT_WINDOW_SECONDS: ${COMMUNITY_MESSAGE_RATE_LIMIT_WINDOW_SECONDS:-10}
+      COMMUNITY_USER_CACHE_TTL_SECONDS: ${COMMUNITY_USER_CACHE_TTL_SECONDS:-300}
+      LOG_SQL: ${LOG_SQL:-false}
+      DB_POOL_MAX: ${COMMUNITY_DB_POOL_MAX:-20}
+      DB_POOL_MIN: ${DB_POOL_MIN:-0}
+      DB_POOL_ACQUIRE_MS: ${DB_POOL_ACQUIRE_MS:-30000}
+      DB_POOL_IDLE_MS: ${DB_POOL_IDLE_MS:-10000}
+      COMMUNITY_RATE_LIMIT_MAX: ${COMMUNITY_RATE_LIMIT_MAX:-3000}
+    depends_on:
+      community-db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - pae-network
+    restart: unless-stopped
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3002/api/community/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ========================================
+  # EXAM SERVICE
+  # ========================================
+  exam-service:
+    build: ./backend/services/exam-service
+    container_name: pae-exam-service
+    ports:
+      - "127.0.0.1:${EXAM_PORT}:3004"
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      UV_THREADPOOL_SIZE: 16
+      SOCKET_MAX_CONNECTIONS: ${SOCKET_MAX_CONNECTIONS:-500}
+      SOCKET_PING_TIMEOUT_MS: ${SOCKET_PING_TIMEOUT_MS:-20000}
+      SOCKET_PING_INTERVAL_MS: ${SOCKET_PING_INTERVAL_MS:-25000}
+      SOCKET_MAX_HTTP_BUFFER_BYTES: ${SOCKET_MAX_HTTP_BUFFER_BYTES:-32768}
+      PORT: 3004
+      DB_HOST: ${EXAM_DB_HOST}
+      DB_PORT: ${EXAM_DB_PORT}
+      DB_NAME: ${EXAM_DB_NAME}
+      DB_USER: ${EXAM_DB_USER}
+      DB_PASSWORD: ${EXAM_DB_PASSWORD}
+      FRONTEND_URL: ${FRONTEND_URL}
+      LOG_SQL: ${LOG_SQL:-false}
+      DB_POOL_MAX: ${EXAM_DB_POOL_MAX:-25}
+      DB_POOL_MIN: ${DB_POOL_MIN:-0}
+      DB_POOL_ACQUIRE_MS: ${DB_POOL_ACQUIRE_MS:-30000}
+      DB_POOL_IDLE_MS: ${DB_POOL_IDLE_MS:-10000}
+      GAMIFICATION_SUMMARY_CACHE_TTL_SECONDS: ${GAMIFICATION_SUMMARY_CACHE_TTL_SECONDS:-15}
+      GAMIFICATION_LEADERBOARD_CACHE_TTL_SECONDS: ${GAMIFICATION_LEADERBOARD_CACHE_TTL_SECONDS:-15}
+    depends_on:
+      exam-db:
+        condition: service_healthy
+    networks:
+      - pae-network
+    restart: unless-stopped
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3004/api/learning/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ========================================
+  # QUALITY SERVICE (SonarQube integration)
+  # ========================================
+  quality-service:
+    build: ./backend/services/quality-service
+    container_name: pae-quality-service
+    ports:
+      - "127.0.0.1:${QUALITY_PORT:-3005}:3005"
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 3005
+      FRONTEND_URL: ${FRONTEND_URL}
+      JWT_SECRET: ${JWT_SECRET}
+      SONARQUBE_URL: ${SONARQUBE_URL:-http://host.docker.internal:9010}
+      SONARQUBE_PUBLIC_URL: ${SONARQUBE_PUBLIC_URL:-http://localhost:9010}
+      SONAR_PROJECT_KEY: ${SONAR_PROJECT_KEY:-pae-completo-local}
+      SONAR_TOKEN: ${SONAR_TOKEN}
+      SONAR_CACHE_TTL_SECONDS: ${SONAR_CACHE_TTL_SECONDS:-60}
+      SONAR_REQUEST_TIMEOUT_MS: ${SONAR_REQUEST_TIMEOUT_MS:-8000}
+      QUALITY_RATE_LIMIT_MAX: ${QUALITY_RATE_LIMIT_MAX:-120}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - pae-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3005/api/quality/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  # ========================================
+  # AUTH DATABASE
+  # ========================================
+  auth-db:
+    image: postgres:15-alpine
+    container_name: pae-auth-db
+    ports:
+      - "127.0.0.1:${AUTH_DB_HOST_PORT}:5432"
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: ${AUTH_DB_NAME}
+      POSTGRES_USER: ${AUTH_DB_USER}
+      POSTGRES_PASSWORD: ${AUTH_DB_PASSWORD}
+    volumes:
+      - auth-db-data:/var/lib/postgresql/data
+      - ./database/auth-db/init:/docker-entrypoint-initdb.d
+    networks:
+      - pae-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${AUTH_DB_USER} -d ${AUTH_DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ========================================
+  # CONTENT DATABASE
+  # ========================================
+  content-db:
+    image: postgres:15-alpine
+    container_name: pae-content-db
+    ports:
+      - "127.0.0.1:${CONTENT_DB_HOST_PORT}:5432"
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: ${CONTENT_DB_NAME}
+      POSTGRES_USER: ${CONTENT_DB_USER}
+      POSTGRES_PASSWORD: ${CONTENT_DB_PASSWORD}
+    volumes:
+      - content-db-data:/var/lib/postgresql/data
+      - ./database/content-db/init:/docker-entrypoint-initdb.d
+    networks:
+      - pae-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${CONTENT_DB_USER} -d ${CONTENT_DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ========================================
+  # COMMUNITY DATABASE
+  # ========================================
+  community-db:
+    image: postgres:15-alpine
+    container_name: pae-community-db
+    ports:
+      - "127.0.0.1:${COMMUNITY_DB_HOST_PORT}:5432"
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: ${COMMUNITY_DB_NAME}
+      POSTGRES_USER: ${COMMUNITY_DB_USER}
+      POSTGRES_PASSWORD: ${COMMUNITY_DB_PASSWORD}
+    volumes:
+      - community-db-data:/var/lib/postgresql/data
+      - ./database/community-db/init:/docker-entrypoint-initdb.d
+    networks:
+      - pae-network
+    restart: unless-stopped
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${COMMUNITY_DB_USER} -d ${COMMUNITY_DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ========================================
+  # EXAM DATABASE
+  # ========================================
+  exam-db:
+    image: postgres:15-alpine
+    container_name: pae-exam-db
+    ports:
+      - "127.0.0.1:${EXAM_DB_HOST_PORT}:5432"
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: ${EXAM_DB_NAME}
+      POSTGRES_USER: ${EXAM_DB_USER}
+      POSTGRES_PASSWORD: ${EXAM_DB_PASSWORD}
+    volumes:
+      - exam-db-data:/var/lib/postgresql/data
+    networks:
+      - pae-network
+    restart: unless-stopped
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${EXAM_DB_USER} -d ${EXAM_DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ========================================
+  # REDIS
+  # ========================================
+  redis:
+    image: redis:7-alpine
+    container_name: pae-redis
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "${REDIS_MAXMEMORY:-256mb}", "--maxmemory-policy", "${REDIS_MAXMEMORY_POLICY:-allkeys-lru}"]
+    ports:
+      - "127.0.0.1:${REDIS_HOST_PORT:-6379}:6379"
+    networks:
+      - pae-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+# ========================================
+# NETWORKS
+# ========================================
+networks:
+  pae-network:
+    driver: bridge
+
+# ========================================
+# VOLUMES
+# ========================================
+volumes:
+  auth-db-data:
+  content-db-data:
+  community-db-data:
+  exam-db-data:
+  content-uploads:

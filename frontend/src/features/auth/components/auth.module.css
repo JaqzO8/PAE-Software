@@ -1,0 +1,13 @@
+/* src/features/auth/components/auth.module.css */
+
+.loginContainer {
+  @apply space-y-6; /* Usamos @apply para mezclar Tailwind */
+}
+
+.forgotPasswordLink {
+  @apply text-xs text-brand-action hover:underline font-medium;
+}
+
+.submitButton {
+  @apply w-full bg-brand-action hover:bg-brand-action/90 text-white font-bold transition-all;
+}

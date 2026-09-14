@@ -1,0 +1,44 @@
+# Configuración privada y credenciales
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+credentials*.json
+service-account*.json
+.npmrc
+.netrc
+
+# Dependencias y archivos generados
+node_modules/
+dist/
+build/
+coverage/
+.scannerwork/
+*.tsbuildinfo
+*.log
+__pycache__/
+*.pyc
+
+# Datos locales y evidencias que pueden contener información personal
+uploads/
+backups/
+tmp/
+sonar-evidence/
+test-results/
+playwright-report/
+.agents/
+.codex/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.bak
+*.dump
+*.sqlite
+*.sqlite3

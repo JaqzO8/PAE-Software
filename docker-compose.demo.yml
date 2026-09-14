@@ -1,0 +1,36 @@
+services:
+  demo-proxy:
+    image: nginx:1.27-alpine
+    container_name: pae-demo-proxy
+    environment:
+      PUBLIC_FRONTEND_ORIGIN: ${PUBLIC_FRONTEND_ORIGIN:-http://localhost:5173}
+      NGINX_ENVSUBST_FILTER: ^PUBLIC_FRONTEND_ORIGIN$
+    volumes:
+      - ./deploy/demo/nginx.conf:/etc/nginx/templates/default.conf.template:ro
+    ports:
+      - "${DEMO_PORT:-8080}:8080"
+    depends_on:
+      frontend:
+        condition: service_healthy
+      nginx-gateway:
+        condition: service_started
+    networks:
+      - pae-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:8080/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  demo-tunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: pae-demo-tunnel
+    command: tunnel --no-autoupdate --url http://demo-proxy:8080
+    depends_on:
+      demo-proxy:
+        condition: service_healthy
+    networks:
+      - pae-network
+    restart: unless-stopped

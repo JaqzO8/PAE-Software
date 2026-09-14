@@ -1,0 +1,42 @@
+name: Validacion PAE
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: node scripts/check-repository-safety.mjs
+      - run: npm ci --prefix frontend
+      - run: npm run build --prefix frontend
+
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm ci
+      - run: npm ci --prefix backend/services/content-service
+      - run: npm ci --prefix backend/services/quality-service
+      - run: npm ci --prefix backend/services/auth-service
+      - run: npm ci --prefix backend/services/community-service
+      - run: npm test --prefix backend/services/content-service -- --runInBand
+      - run: npm test --prefix backend/services/quality-service
+      - run: npm run test:exam
+      - run: node scripts/verify-config.mjs

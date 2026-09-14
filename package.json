@@ -1,0 +1,19 @@
+{
+  "devDependencies": {
+    "jest": "^30.3.0",
+    "supertest": "^7.2.2"
+  },
+  "name": "pae-software",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Plataforma de apoyo academico para estudiantes y docentes",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "scripts": {
+    "setup:local": "node scripts/setup-local.mjs",
+    "check:safety": "node scripts/check-repository-safety.mjs",
+    "test:exam": "jest backend/services/exam-service/src/tests/liveAnswerRules.conditionCoverage.test.js --runInBand --ci",
+    "test:config": "node scripts/verify-config.mjs"
+  }
+}
