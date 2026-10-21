@@ -76,6 +76,8 @@ El piloto solo admite la primera versión de un resultado confirmado. Recalifica
 
 ## Trazabilidad y siguiente trabajo
 
+La [guía de continuación del equipo](continuacion/README.md) organiza las siguientes entregas por rama, con el catálogo completo y las pruebas hasta la aceptación final.
+
 | Ticket / fuente | Resultado de esta entrega | Pendiente para cierre |
 |---|---|---|
 | Base H1, RIC-05/JUA-05/AME-05/JOS-05 | Separación app/arranque, pruebas de factories, contrato inicial, control de dependencias y CI | Extraer verticales propias de Identidad/Contenido/Evaluación |

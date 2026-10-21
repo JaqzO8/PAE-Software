@@ -2,18 +2,20 @@
 
 El equipo integra cambios mediante pull requests a `develop` y prepara entregas revisadas en `main`. Cada cambio debe relacionarse con un RQ o una historia, explicar el comportamiento que aporta y adjuntar validación relevante.
 
+Para continuar la nueva arquitectura, seguir la [guía secuencial por integrante](docs/continuacion/README.md), con el backlog completo, contratos, migraciones y [plan de pruebas](docs/continuacion/PLAN_PRUEBAS.md).
+
 ## Ramas
 
 | Rama | Propósito |
 | --- | --- |
 | main | Base de entregas revisadas, predeterminada |
 | develop | Integración conjunta y pruebas |
-| José_Queshyac | Desarrollo personal de José |
+| Jose_Queshyac | Desarrollo personal de José |
 | Amelia_Mauricio | Desarrollo personal de Amelia |
 | Richard_Estela | Desarrollo personal de Richard |
 | Juan_Rengifo | Desarrollo personal de Juan |
 
-Los nombres son exactos; el acento de José forma parte del nombre de la rama. Cada integrante necesita acceso al repositorio y su propia identidad de Git. No compartan cuentas ni tokens.
+Los nombres son exactos. La rama activa de José es `Jose_Queshyac`, sin acento; la antigua `José_Queshyac` es distinta. Cada integrante necesita acceso al repositorio y su propia identidad de Git. No compartan cuentas ni tokens.
 
 ## Flujo de trabajo
 
@@ -23,11 +25,11 @@ Ejemplo para José; los demás sustituyen su rama:
 git clone https://github.com/JaqzO8/PAE-Software.git
 cd PAE-Software
 git fetch origin
-git switch --track origin/José_Queshyac
+git switch --track origin/Jose_Queshyac
 git merge origin/develop
 ```
 
-Si la rama ya existe localmente, utiliza `git switch José_Queshyac`. Resuelve conflictos comprobando el comportamiento de ambos cambios; no sobrescribas archivos completos para evitarlos.
+Si la rama ya existe localmente, utiliza `git switch Jose_Queshyac`. Resuelve conflictos comprobando el comportamiento de ambos cambios; no sobrescribas archivos completos para evitarlos.
 
 ```sh
 git status --short
@@ -35,7 +37,7 @@ git add <archivos-del-cambio>
 node scripts/check-repository-safety.mjs --staged
 git diff --cached
 git commit -m "feat(contenido): permite compartir repositorios RQ15"
-git push -u origin José_Queshyac
+git push -u origin Jose_Queshyac
 ```
 
 Crea un pull request con base `develop`, describe problema y resultado, RQ/HU por módulo, pruebas y limitaciones. Tras revisión y controles correctos, integra el cambio. Actualiza la rama personal con `origin/develop` antes del siguiente trabajo. Para una entrega, abre un pull request de `develop` a `main` y valida el recorrido integrado.
