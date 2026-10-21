@@ -2,9 +2,13 @@
  * Middleware global de manejo de errores
  */
 const multer = require('multer');
+const { CommunityError } = require('../domain/communityPolicy');
 
 const errorHandler = (err, req, res, next) => {
-    console.error('❌ Error:', err);
+    if (err instanceof CommunityError) {
+        return res.status(err.status).json({ success: false, code: err.code, message: err.message });
+    }
+    console.error('Community request failed', { name: err.name, code: err.original?.code || err.code });
 
     // Error de Multer (archivos)
     if (err instanceof multer.MulterError) {
@@ -44,7 +48,7 @@ const errorHandler = (err, req, res, next) => {
     // Error por defecto
     res.status(err.status || 500).json({
         success: false,
-        message: err.message || 'Error interno del servidor',
+        message: err.status && err.status < 500 ? err.message : 'Error interno del servidor',
     });
 };
 

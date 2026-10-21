@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const AuthController = require('../controllers/authController');
+const { searchPublicUsers } = require('../interfaces/http/publicUsers');
 const PlatformController = require('../controllers/platformController');
 const { verifyToken } = require('../middlewares/authMiddleware');
 const {
@@ -67,6 +68,7 @@ router.get(
     AuthController.verify
 );
 
+router.get('/users/search', verifyToken, searchPublicUsers);
 router.put('/profile', verifyToken, AuthController.updateProfile);
 router.put('/password', verifyToken, validateUpdatePassword, handleValidationErrors, AuthController.updatePassword);
 router.get('/sessions', verifyToken, AuthController.getSessions);

@@ -2,6 +2,7 @@ const { MensajeCanal, MiembroComunidad, Comunidad } = require('../models');
 const axios = require('axios');
 const config = require('../config/env');
 const { redis } = require('../config/redis');
+const useCases = require('../bootstrap/community');
 
 const clampNumber = (value, min, max, fallback) => {
     const number = Number(value);
@@ -152,40 +153,7 @@ class MessageController {
                 });
             }
 
-            // Verificar que la comunidad existe y esta activa
-            const community = await Comunidad.findOne({
-                where: { id_comunidad: id, activa: true },
-            });
-
-        if (!community) {
-            return res.status(404).json({
-                success: false,
-                message: 'Comunidad no encontrada o eliminada',
-            });
-        }
-
-        // Verificar que el usuario es miembro activo
-        const member = await MiembroComunidad.findOne({
-            where: {
-                comunidad_id: id,
-                usuario_id: userId,
-                activo: true,
-            },
-        });
-
-        if (!member) {
-            return res.status(403).json({
-                success: false,
-                message: 'No puedes enviar mensajes en esta comunidad',
-            });
-        }
-
-        const message = await MensajeCanal.create({
-            comunidad_id: id,
-            usuario_id: userId,
-            contenido,
-            fecha_envio: new Date(),
-        });
+            const message = await useCases.publishMessage({ communityId: id, actor: req.user, content: req.body.contenido });
 
         const userInfo = await getCachedUserInfo(userId, req.token);
 

@@ -1,3 +1,4 @@
+const useCases = require('../bootstrap/community');
 const { Comunidad, MiembroComunidad, MensajeCanal, DesafioSemanal } = require('../models');
 const { Op } = require('sequelize');
 const axios = require('axios');
@@ -13,58 +14,9 @@ class CommunityController {
      */
     static async create(req, res, next) {
         try {
-            const { nombre, descripcion, icono_url, materia, es_publica } = req.body;
-            const profesorId = req.user.id;
-
-            // Validar que el usuario es docente
-            if (req.user.rol !== 'docente') {
-                return res.status(403).json({
-                    success: false,
-                    message: 'Solo los docentes pueden crear comunidades',
-                });
-            }
-
-            // Crear comunidad
-            const comunidad = await Comunidad.create({
-                nombre: nombre.trim(),
-                descripcion: descripcion?.trim() || null,
-                icono_url: icono_url || null,
-                materia: materia?.trim() || null,
-                profesor_id: profesorId,
-                es_publica: es_publica !== false,
-                puntos_prestigio: 0,
-                proximo_hito: 100,
-                activa: true,
-            });
-
-            // Agregar al profesor como miembro automáticamente
-            await MiembroComunidad.create({
-                comunidad_id: comunidad.id_comunidad,
-                usuario_id: profesorId,
-                rol_comunidad: 'profesor',
-                puntos_individuales: 0,
-                activo: true,
-            });
-
-            res.status(201).json({
-                success: true,
-                message: 'Comunidad creada exitosamente',
-                community: {
-                    id: comunidad.id_comunidad,
-                    nombre: comunidad.nombre,
-                    descripcion: comunidad.descripcion,
-                    icono_url: comunidad.icono_url,
-                    materia: comunidad.materia,
-                    profesor_id: comunidad.profesor_id,
-                    puntos_prestigio: comunidad.puntos_prestigio,
-                    proximo_hito: comunidad.proximo_hito,
-                    es_publica: comunidad.es_publica,
-                    fecha_creacion: comunidad.fecha_creacion,
-                },
-            });
-        } catch (error) {
-            next(error);
-        }
+            const community = await useCases.create({ actor: req.user, input: req.body });
+            res.status(201).json({ success: true, message: 'Comunidad creada exitosamente', community: { ...community, id: community.id_comunidad } });
+        } catch (error) { next(error); }
     }
 
     /**
@@ -159,7 +111,8 @@ class CommunityController {
                         descripcion: community.descripcion,
                         icono_url: community.icono_url,
                         materia: community.materia,
-                        profesor: profesorInfo ? {
+                        profesor_id: community.profesor_id,
+                    profesor: profesorInfo ? {
                             id: profesorInfo.id,
                             nombres: profesorInfo.nombres,
                             apellidos: profesorInfo.apellidos,
@@ -251,7 +204,8 @@ class CommunityController {
                         descripcion: community.descripcion,
                         icono_url: community.icono_url,
                         materia: community.materia,
-                        profesor: profesorInfo ? {
+                        profesor_id: community.profesor_id,
+                    profesor: profesorInfo ? {
                             id: profesorInfo.id,
                             nombres: profesorInfo.nombres,
                             apellidos: profesorInfo.apellidos,
@@ -313,6 +267,15 @@ class CommunityController {
                     success: false,
                     message: 'Esta comunidad es privada',
                 });
+            }
+
+            if (!isMember) {
+                return res.json({ success: true, community: {
+                    id: community.id_comunidad, nombre: community.nombre,
+                    descripcion: community.descripcion, materia: community.materia,
+                    icono_url: community.icono_url, es_publica: true, is_member: false,
+                    miembros_count: community.miembros.length, messages: [], participants: [], forums: [],
+                } });
             }
 
             // Obtener información del profesor
@@ -382,7 +345,7 @@ class CommunityController {
                             : 'Usuario desconocido',
                         role: member.rol_comunidad === 'profesor' ? 'docente' : 'estudiante',
                         avatar: userInfo?.avatar || null,
-                        email: userInfo?.email || '',
+                        email: '', // Contact details are private to Identity.
                         joinedAt: member.fecha_union,
                     };
                 })
@@ -412,6 +375,7 @@ class CommunityController {
                     descripcion: community.descripcion,
                     icono_url: community.icono_url,
                     materia: community.materia,
+                    profesor_id: community.profesor_id,
                     profesor: profesorInfo ? {
                         id: profesorInfo.id,
                         nombres: profesorInfo.nombres,
@@ -451,66 +415,9 @@ class CommunityController {
      */
     static async join(req, res, next) {
         try {
-            const { id } = req.params;
-            const userId = req.user.id;
-
-            const community = await Comunidad.findOne({
-                where: { id_comunidad: id, activa: true },
-            });
-
-            if (!community) {
-                return res.status(404).json({
-                    success: false,
-                    message: 'Comunidad no encontrada',
-                });
-            }
-
-            if (!community.es_publica) {
-                return res.status(403).json({
-                    success: false,
-                    message: 'Esta comunidad requiere invitación',
-                });
-            }
-
-            // Verificar si ya es miembro
-            const existingMember = await MiembroComunidad.findOne({
-                where: {
-                    comunidad_id: id,
-                    usuario_id: userId,
-                },
-            });
-
-            if (existingMember) {
-                if (existingMember.activo) {
-                    return res.status(400).json({
-                        success: false,
-                        message: 'Ya eres miembro de esta comunidad',
-                    });
-                } else {
-                    // Reactivar membresía
-                    await existingMember.update({
-                        activo: true,
-                        fecha_union: new Date(),
-                    });
-                }
-            } else {
-                // Crear nueva membresía
-                await MiembroComunidad.create({
-                    comunidad_id: id,
-                    usuario_id: userId,
-                    rol_comunidad: 'miembro',
-                    puntos_individuales: 0,
-                    activo: true,
-                });
-            }
-
-            res.status(200).json({
-                success: true,
-                message: 'Te has unido a la comunidad exitosamente',
-            });
-        } catch (error) {
-            next(error);
-        }
+            await useCases.join({ communityId: req.params.id, actor: req.user });
+            res.status(200).json({ success: true, message: 'Te has unido a la comunidad exitosamente' });
+        } catch (error) { next(error); }
     }
 
     /**
@@ -519,41 +426,9 @@ class CommunityController {
      */
     static async leave(req, res, next) {
         try {
-            const { id } = req.params;
-            const userId = req.user.id;
-
-            const member = await MiembroComunidad.findOne({
-                where: {
-                    comunidad_id: id,
-                    usuario_id: userId,
-                    activo: true,
-                },
-            });
-
-            if (!member) {
-                return res.status(404).json({
-                    success: false,
-                    message: 'No eres miembro de esta comunidad',
-                });
-            }
-
-            // No permitir que el profesor salga de su propia comunidad
-            if (member.rol_comunidad === 'profesor') {
-                return res.status(403).json({
-                    success: false,
-                    message: 'Como profesor, no puedes salir de tu propia comunidad. Elimínala si deseas cerrarla.',
-                });
-            }
-
-            await member.update({ activo: false });
-
-            res.status(200).json({
-                success: true,
-                message: 'Has salido de la comunidad',
-            });
-        } catch (error) {
-            next(error);
-        }
+            await useCases.leave({ communityId: req.params.id, actor: req.user });
+            res.status(200).json({ success: true, message: 'Has salido de la comunidad' });
+        } catch (error) { next(error); }
     }
 
     /**
@@ -562,46 +437,9 @@ class CommunityController {
      */
     static async delete(req, res, next) {
         try {
-            const { id } = req.params;
-            const userId = req.user.id;
-
-            const community = await Comunidad.findOne({
-                where: { id_comunidad: id, activa: true },
-            });
-
-            if (!community) {
-                return res.status(404).json({
-                    success: false,
-                    message: 'Comunidad no encontrada',
-                });
-            }
-
-            if (!sameId(community.profesor_id, userId) && req.user.rol !== 'admin') {
-                return res.status(403).json({
-                    success: false,
-                    message: 'Solo el profesor creador puede eliminar esta comunidad',
-                });
-            }
-
-            // Soft delete
-            await community.update({
-                activa: false,
-                fecha_eliminacion: new Date(),
-            });
-
-            // Desactivar todas las membresías
-            await MiembroComunidad.update(
-                { activo: false },
-                { where: { comunidad_id: id } }
-            );
-
-            res.status(200).json({
-                success: true,
-                message: 'Comunidad eliminada exitosamente',
-            });
-        } catch (error) {
-            next(error);
-        }
+            await useCases.close({ communityId: req.params.id, actor: req.user });
+            res.status(200).json({ success: true, message: 'Comunidad eliminada exitosamente' });
+        } catch (error) { next(error); }
     }
 
     /**
@@ -610,63 +448,9 @@ class CommunityController {
      */
     static async kickMember(req, res, next) {
         try {
-            const { id, userId } = req.params;
-            const { motivo } = req.body;
-            const profesorId = req.user.id;
-
-            const community = await Comunidad.findOne({
-                where: { id_comunidad: id, activa: true },
-            });
-
-            if (!community) {
-                return res.status(404).json({
-                    success: false,
-                    message: 'Comunidad no encontrada',
-                });
-            }
-
-            if (!sameId(community.profesor_id, profesorId)) {
-                return res.status(403).json({
-                    success: false,
-                    message: 'Solo el profesor puede expulsar miembros',
-                });
-            }
-
-            const member = await MiembroComunidad.findOne({
-                where: {
-                    comunidad_id: id,
-                    usuario_id: userId,
-                    activo: true,
-                },
-            });
-
-            if (!member) {
-                return res.status(404).json({
-                    success: false,
-                    message: 'El usuario no es miembro de esta comunidad',
-                });
-            }
-
-            if (member.rol_comunidad === 'profesor') {
-                return res.status(403).json({
-                    success: false,
-                    message: 'No puedes expulsar al profesor creador',
-                });
-            }
-
-            await member.update({
-                activo: false,
-                fecha_expulsion: new Date(),
-                motivo_expulsion: motivo || 'No especificado',
-            });
-
-            res.status(200).json({
-                success: true,
-                message: 'Miembro expulsado exitosamente',
-            });
-        } catch (error) {
-            next(error);
-        }
+            await useCases.kick({ communityId: req.params.id, actor: req.user, userId: req.params.userId, reason: req.body.motivo });
+            res.status(200).json({ success: true, message: 'Miembro expulsado exitosamente' });
+        } catch (error) { next(error); }
     }
 }
 

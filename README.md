@@ -6,6 +6,8 @@ Este repositorio reúne el código disponible y la documentación de su estado r
 
 ## Documentación
 
+La base de la nueva arquitectura y el primer avance de Comunidad/Gamificación se describen en [Arquitectura de transición](docs/ARQUITECTURA_TRANSICION.md). Para ejecutarlos y verificarlos en Docker `pruebas_pae`, consulta el [runbook de pruebas](docs/RUNBOOK_PRUEBAS_ARQUITECTURA.md).
+
 | Documento | Contenido |
 | --- | --- |
 | [Resumen ejecutivo](docs/RESUMEN_EJECUTIVO.md) | Objetivo, alcance, interesados, ocho módulos, flujo completo, avances y pendientes |
@@ -46,7 +48,7 @@ La configuración inicial es de **desarrollo local**; los puertos publicados se 
 | `Richard_Estela` | Trabajo de Richard |
 | `Juan_Rengifo` | Trabajo de Juan |
 
-Las ramas personales nacen de la misma base que `develop`. Conserva exactamente el acento de `Jose_Queshyac` y los guiones bajos. La creación de una rama no concede acceso a GitHub: los colaboradores necesitan una invitación independiente del propietario.
+Las ramas personales nacen de la misma base que `develop`. La rama actual de José es `Jose_Queshyac`, sin tilde; la rama antigua `José_Queshyac` también existe y es distinta. La creación de una rama no concede acceso a GitHub: los colaboradores necesitan una invitación independiente del propietario.
 
 ## Publicación segura
 

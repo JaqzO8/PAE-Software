@@ -25,6 +25,7 @@ import {
   ScrollArea,
 } from "../../../desingSystem/primitives";
 import { ParticipantsSheet } from "../components/ParticipantsSheet";
+import { InviteStudent } from "../components/InviteStudent";
 import {
   getGroupDetail,
   leaveGroup,
@@ -139,6 +140,7 @@ export default function GroupDetail() {
         Volver a Mis Comunidades
       </Button>
 
+      {isTeacher && group.ownerId === String(user?.id) && <InviteStudent key={group.id} communityId={group.id} />}
       {/* Contenedor Principal estilo Chat */}
       <div className={styles.chatContainer}>
         {/* Header Clickeable */}
