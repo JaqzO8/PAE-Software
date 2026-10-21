@@ -10,7 +10,6 @@ La base de la nueva arquitectura y el primer avance de Comunidad/Gamificación s
 
 | Documento | Contenido |
 | --- | --- |
-| [Continuación del equipo](docs/continuacion/README.md) | Orden de entregas, guía para cada rama, trazabilidad de los 114 RQ/78 historias y pruebas de cierre |
 | [Resumen ejecutivo](docs/RESUMEN_EJECUTIVO.md) | Objetivo, alcance, interesados, ocho módulos, flujo completo, avances y pendientes |
 | [Matriz de requisitos](docs/MATRIZ_REQUISITOS.md) | RQ01–RQ114, estado documental, evidencia del código y brechas |
 | [Historias de usuario](docs/HISTORIAS_USUARIO.md) | 78 secciones de historias o épicas y sus tablas de aceptación, distribuidas por módulo |
