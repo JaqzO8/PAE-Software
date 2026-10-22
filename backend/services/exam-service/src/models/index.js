@@ -14,6 +14,7 @@ const LearningNotification = require('./LearningNotification');
 const GamificationSetting = require('./GamificationSetting');
 const GamificationProfile = require('./GamificationProfile');
 const GamificationEvent = require('./GamificationEvent');
+const ExamOutbox = require('./ExamOutbox');
 
 University.hasMany(Question, { foreignKey: 'id_universidad', as: 'preguntas' });
 Question.belongsTo(University, { foreignKey: 'id_universidad', as: 'universidad' });
@@ -243,6 +244,7 @@ module.exports = {
     GamificationSetting,
     GamificationProfile,
     GamificationEvent,
+    ExamOutbox,
     seedExamData,
     seedAnalyticsSettings,
     seedAchievementDefinitions,

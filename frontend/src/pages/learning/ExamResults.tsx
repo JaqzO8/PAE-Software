@@ -50,6 +50,7 @@ const ExamResults = () => {
 
   const getPerformanceMessage = () => {
     if (result.offlinePending) return "Tu intento quedo guardado en este dispositivo y se sincronizara al recuperar conexion.";
+    if (result.expired) return "El intento venció. El servidor no incorporó las respuestas que llegaron después del límite.";
     if (result.requiresManualReview) return "Tu resultado parcial fue registrado. Un docente revisara las respuestas abiertas.";
     if (percentage >= 90) return "¡Excelente! Dominas estos temas a la perfección.";
     if (percentage >= 75) return "¡Muy bien! Estás en buen camino hacia tu meta.";
@@ -89,6 +90,14 @@ const ExamResults = () => {
               <p className="text-sm text-orange-700">
                 Puedes cerrar esta pantalla. PAE intentara enviar el resultado automaticamente cuando vuelva la conexion.
               </p>
+            </CardContent>
+          </Card>
+        )}
+        {result.expired && (
+          <Card className="mb-6 border-orange-200 bg-orange-50">
+            <CardContent className="p-4">
+              <p className="font-semibold text-orange-800">Tiempo agotado</p>
+              <p className="text-sm text-orange-700">La entrega llegó después del límite del servidor y sus respuestas tardías no se incorporaron.</p>
             </CardContent>
           </Card>
         )}
@@ -149,7 +158,7 @@ const ExamResults = () => {
                   <TrendingUp className="h-8 w-8 mx-auto text-purple-600" />
                 </div>
                 <p className="text-4xl font-bold text-purple-600">
-                  {result.percentile}%
+                  {result.percentile == null ? "—" : `${result.percentile}%`}
                 </p>
                 <p className="text-sm text-muted-foreground mt-1">Percentil</p>
               </div>

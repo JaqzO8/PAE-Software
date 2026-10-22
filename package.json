@@ -13,7 +13,7 @@
   "scripts": {
     "setup:local": "node scripts/setup-local.mjs",
     "check:safety": "node scripts/check-repository-safety.mjs",
-    "test:exam": "jest backend/services/exam-service/src/tests/liveAnswerRules.conditionCoverage.test.js --runInBand --ci",
+    "test:exam": "jest backend/services/exam-service/src/tests --runInBand --ci",
     "test:config": "node scripts/verify-config.mjs",
     "check:architecture": "node scripts/check-architecture.mjs",
     "test:architecture": "node --test tests/architecture/*.test.cjs",

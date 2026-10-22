@@ -1,4 +1,5 @@
 const { Op } = require('sequelize');
+const { randomUUID } = require('node:crypto');
 const {
     University,
     Question,
@@ -10,7 +11,10 @@ const {
     TriviaRoom,
     TriviaMatch,
     AnalyticsSetting,
+    ExamOutbox,
 } = require('../models');
+const { sequelize } = require('../config/database');
+const { createQuestionSnapshot, hashSubmission, scoreSnapshot } = require('../services/attemptRules');
 const AchievementService = require('../services/achievementService');
 const GamificationService = require('../services/gamificationService');
 const { hasAlreadyAnswered } = require('../services/liveAnswerRules');
@@ -352,13 +356,18 @@ class LearningController {
 
             const selectedQuestions = shuffle(questions).slice(0, Math.min(Number(questionCount), questions.length));
             const timeLimit = normalizedDifficulty === 'facil' ? 9000 : normalizedDifficulty === 'medio' ? 7200 : 5760;
+            const startedAt = new Date();
+            const deadline = new Date(startedAt.getTime() + timeLimit * 1000);
 
             const attempt = await SimulacroAttempt.create({
                 id_usuario: req.user.id,
                 id_universidad: university.id_universidad,
                 dificultad: normalizedDifficulty,
                 preguntas: selectedQuestions.map((question) => question.id_pregunta),
+                preguntas_snapshot: selectedQuestions.map(createQuestionSnapshot),
                 limite_segundos: timeLimit,
+                fecha_inicio: startedAt,
+                fecha_limite: deadline,
                 total_preguntas: selectedQuestions.length,
             });
 
@@ -366,6 +375,7 @@ class LearningController {
                 id: String(attempt.id_intento),
                 questions: selectedQuestions.map(toFrontendQuestion),
                 timeLimit,
+                deadline: deadline.toISOString(),
                 config: {
                     universityId,
                     difficulty: normalizedDifficulty,
@@ -378,88 +388,98 @@ class LearningController {
 
     static async submitSimulacro(req, res, next) {
         try {
-            const { simulacroId, answers, timeSpent = 0 } = req.body;
-
-            const attempt = await SimulacroAttempt.findOne({
-                where: { id_intento: simulacroId, id_usuario: req.user.id },
-            });
-
-            if (!attempt) {
-                return res.status(404).json({ success: false, message: 'Simulacro no encontrado' });
+            const { simulacroId, answers } = req.body;
+            const idempotencyKey = String(req.get('Idempotency-Key') || '').trim();
+            if (!idempotencyKey || idempotencyKey.length > 128) {
+                return res.status(400).json({ success: false, message: 'Se requiere una clave de idempotencia válida' });
+            }
+            if (!Array.isArray(answers) || answers.length > 200 || answers.some((answer) => (
+                answer !== null
+                && typeof answer !== 'string'
+                && (typeof answer !== 'number' || !Number.isFinite(answer))
+            ) || (typeof answer === 'string' && answer.length > 20000))) {
+                return res.status(400).json({ success: false, message: 'Respuestas inválidas' });
             }
 
-            if (attempt.estado === 'finalizado') {
-                return res.status(409).json({ success: false, message: 'El simulacro ya fue enviado' });
-            }
+            const payloadHash = hashSubmission(answers);
+            const result = await sequelize.transaction(async (transaction) => {
+                const attempt = await SimulacroAttempt.findOne({
+                    where: { id_intento: simulacroId, id_usuario: req.user.id },
+                    transaction,
+                    lock: transaction.LOCK.UPDATE,
+                });
+                if (!attempt) return { status: 404, body: { success: false, message: 'Simulacro no encontrado' } };
 
-            const questions = await Question.findAll({
-                where: { id_pregunta: { [Op.in]: attempt.preguntas } },
-            });
-
-            const byId = new Map(questions.map((question) => [question.id_pregunta, question]));
-            const ordered = attempt.preguntas.map((id) => byId.get(id)).filter(Boolean);
-            let correctAnswers = 0;
-            let pendingManualReviews = 0;
-
-            const solutions = ordered.map((question, index) => {
-                const userAnswer = Array.isArray(answers) ? answers[index] : -1;
-                const isCorrect = question.tipo === 'opcion_multiple' && userAnswer === question.respuesta_correcta;
-                if (isCorrect) correctAnswers += 1;
-                if (question.tipo === 'abierta' && !isBlankAnswer(userAnswer) && userAnswer !== -1) {
-                    pendingManualReviews += 1;
+                if (attempt.estado === 'finalizado') {
+                    if (attempt.clave_idempotencia === idempotencyKey && attempt.hash_solicitud === payloadHash) {
+                        return { status: 200, body: attempt.resultado_confirmado };
+                    }
+                    return { status: 409, body: { success: false, message: 'El simulacro ya fue enviado con otra solicitud' } };
                 }
 
-                return {
-                    question: toFrontendQuestion(question, { includeAnswer: true }),
-                    userAnswer,
-                    isCorrect,
-                    requiresManualReview: question.tipo === 'abierta',
+                const now = new Date();
+                const deadline = attempt.fecha_limite || new Date(new Date(attempt.fecha_inicio).getTime() + Number(attempt.limite_segundos) * 1000);
+                const expired = now.getTime() > new Date(deadline).getTime();
+                const snapshot = Array.isArray(attempt.preguntas_snapshot) && attempt.preguntas_snapshot.length > 0
+                    ? attempt.preguntas_snapshot
+                    : await Question.findAll({
+                        where: { id_pregunta: { [Op.in]: attempt.preguntas } },
+                        transaction,
+                    }).then((questions) => {
+                        const byId = new Map(questions.map((question) => [String(question.id_pregunta), createQuestionSnapshot(question)]));
+                        return attempt.preguntas.map((id) => byId.get(String(id))).filter(Boolean);
+                    });
+                const acceptedAnswers = expired ? [] : answers;
+                const scored = scoreSnapshot(snapshot, acceptedAnswers, now);
+                const elapsedSeconds = Math.max(0, Math.min(Number(attempt.limite_segundos), Math.floor((now.getTime() - new Date(attempt.fecha_inicio).getTime()) / 1000)));
+                scored.timeSpent = elapsedSeconds;
+                const event = {
+                    eventId: randomUUID(),
+                    type: 'ResultadoConfirmado.v1',
+                    schemaVersion: 1,
+                    producer: 'evaluation',
+                    correlationId: randomUUID(),
+                    occurredAt: now.toISOString(),
+                    data: { attemptId: String(attempt.id_intento), userId: String(req.user.id), resultVersion: 1, status: 'confirmed' },
                 };
+                const persisted = { ...scored, expired, newAchievements: [], gamification: null };
+                const answersForStorage = snapshot.map((_, index) => acceptedAnswers[index] ?? -1);
+
+                await attempt.update({
+                    respuestas: answersForStorage,
+                    estado: 'finalizado',
+                    tiempo_usado: elapsedSeconds,
+                    puntaje: scored.score,
+                    correctas: scored.correctAnswers,
+                    total_preguntas: scored.totalQuestions,
+                    fecha_fin: now,
+                    clave_idempotencia: idempotencyKey,
+                    hash_solicitud: payloadHash,
+                    resultado_confirmado: persisted,
+                }, { transaction });
+
+                const openReviews = snapshot
+                    .map((question, index) => ({ question, answer: acceptedAnswers[index] }))
+                    .filter(({ question, answer }) => question.type === 'abierta' && !isBlankAnswer(answer) && answer !== -1)
+                    .map(({ question, answer }) => ({
+                        id_intento: attempt.id_intento,
+                        id_pregunta: Number(question.id),
+                        id_estudiante: req.user.id,
+                        respuesta_texto: answerToText(answer),
+                    }));
+                if (openReviews.length > 0) await OpenAnswerReview.bulkCreate(openReviews, { ignoreDuplicates: true, transaction });
+                if (!scored.requiresManualReview) {
+                    await ExamOutbox.create({
+                        event_id: event.eventId,
+                        aggregate_id: String(attempt.id_intento),
+                        event_type: event.type,
+                        payload: event,
+                    }, { transaction });
+                }
+                return { status: 200, body: persisted };
             });
 
-            const score = Math.round((correctAnswers / Math.max(ordered.length, 1)) * 100);
-            const percentile = Math.min(99, Math.round((correctAnswers / Math.max(ordered.length, 1)) * 100));
-
-            await attempt.update({
-                respuestas: Array.isArray(answers) ? answers : [],
-                estado: 'finalizado',
-                tiempo_usado: Number(timeSpent),
-                puntaje: score,
-                correctas: correctAnswers,
-                total_preguntas: ordered.length,
-                fecha_fin: new Date(),
-            });
-
-            const openReviews = ordered
-                .map((question, index) => ({
-                    question,
-                    answer: Array.isArray(answers) ? answers[index] : '',
-                }))
-                .filter(({ question, answer }) => question.tipo === 'abierta' && !isBlankAnswer(answer) && answer !== -1)
-                .map(({ question, answer }) => ({
-                    id_intento: attempt.id_intento,
-                    id_pregunta: question.id_pregunta,
-                    id_estudiante: req.user.id,
-                    respuesta_texto: answerToText(answer),
-                }));
-
-            if (openReviews.length > 0) {
-                await OpenAnswerReview.bulkCreate(openReviews, { ignoreDuplicates: true });
-            }
-            const newAchievements = await AchievementService.evaluateUser(req.user.id, attempt);
-            const gamification = await GamificationService.processSimulacroSubmission(req.user, attempt, newAchievements);
-
-            return res.status(200).json({
-                score,
-                totalQuestions: ordered.length,
-                correctAnswers,
-                timeSpent: Number(timeSpent),
-                percentile,
-                requiresManualReview: pendingManualReviews > 0,
-                newAchievements,
-                gamification,
-                solutions,
-            });
+            return res.status(result.status).json(result.body);
         } catch (error) {
             return next(error);
         }
