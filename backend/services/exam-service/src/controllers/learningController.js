@@ -6,6 +6,7 @@ const {
     SimulacroAttempt,
     SavedQuestion,
     OpenAnswerReview,
+    OpenAnswerReviewAudit,
     ChallengeRoom,
     ChallengeMatch,
     TriviaRoom,
@@ -14,7 +15,7 @@ const {
     ExamOutbox,
 } = require('../models');
 const { sequelize } = require('../config/database');
-const { createQuestionSnapshot, hashSubmission, scoreSnapshot } = require('../services/attemptRules');
+const { createQuestionSnapshot, hashSubmission, scoreSnapshot, scoreReviewedAttempt } = require('../services/attemptRules');
 const AchievementService = require('../services/achievementService');
 const GamificationService = require('../services/gamificationService');
 const { hasAlreadyAnswered } = require('../services/liveAnswerRules');
@@ -958,73 +959,117 @@ class LearningController {
                 });
             }
 
-            const review = await OpenAnswerReview.findOne({
-                where: { id_intento: attemptId, id_pregunta: questionId },
-            });
-
-            if (!review) {
-                return res.status(404).json({
-                    success: false,
-                    message: 'Revision no encontrada',
+            const result = await sequelize.transaction(async (transaction) => {
+                const attempt = await SimulacroAttempt.findByPk(attemptId, {
+                    transaction,
+                    lock: transaction.LOCK.UPDATE,
                 });
-            }
+                if (!attempt) return { status: 404, body: { success: false, message: 'Intento no encontrado' } };
+                if (attempt.estado !== 'finalizado') return { status: 409, body: { success: false, message: 'El intento aún no fue finalizado' } };
 
-            const attempt = await SimulacroAttempt.findByPk(attemptId);
-            if (!attempt) {
-                return res.status(404).json({
-                    success: false,
-                    message: 'Intento no encontrado',
+                const review = await OpenAnswerReview.findOne({
+                    where: { id_intento: attemptId, id_pregunta: questionId },
+                    transaction,
+                    lock: transaction.LOCK.UPDATE,
                 });
-            }
-
-            await review.update({
-                puntaje: Math.round(puntaje),
-                feedback,
-                estado: 'revisado',
-                id_docente: req.user.id,
-                fecha_revision: new Date(),
-            });
-
-            const questions = await Question.findAll({
-                where: { id_pregunta: { [Op.in]: attempt.preguntas } },
-            });
-            const byId = new Map(questions.map((question) => [question.id_pregunta, question]));
-            const ordered = attempt.preguntas.map((id) => byId.get(id)).filter(Boolean);
-            const respuestas = Array.isArray(attempt.respuestas) ? attempt.respuestas : [];
-
-            let correctAnswers = 0;
-            ordered.forEach((question, index) => {
-                if (question.tipo === 'opcion_multiple' && respuestas[index] === question.respuesta_correcta) {
-                    correctAnswers += 1;
+                if (!review) return { status: 404, body: { success: false, message: 'Revision no encontrada' } };
+                if (review.estado !== 'pendiente') {
+                    return { status: 409, body: { success: false, message: 'La respuesta ya fue revisada; una recalificación requiere contrato de versión' } };
                 }
-            });
 
-            const reviews = await OpenAnswerReview.findAll({
-                where: { id_intento: attemptId, estado: 'revisado' },
-            });
-            const manualPoints = reviews.reduce((sum, item) => sum + Number(item.puntaje || 0), 0);
-            const manuallyCorrect = reviews.filter((item) => Number(item.puntaje || 0) >= 3).length;
-            const earnedPoints = correctAnswers * 5 + manualPoints;
-            const maximumPoints = Math.max(ordered.length * 5, 1);
-            const finalScore = Math.round((earnedPoints / maximumPoints) * 100);
+                const reviewedAt = new Date();
+                const roundedScore = Math.round(puntaje);
+                await review.update({
+                    puntaje: roundedScore,
+                    feedback,
+                    estado: 'revisado',
+                    id_docente: req.user.id,
+                    fecha_revision: reviewedAt,
+                    version: 1,
+                }, { transaction });
+                await OpenAnswerReviewAudit.create({
+                    id_revision: review.id_revision,
+                    version: 1,
+                    id_revisor: req.user.id,
+                    puntaje: roundedScore,
+                    feedback,
+                    fecha: reviewedAt,
+                }, { transaction });
 
-            await attempt.update({
-                puntaje: finalScore,
-                correctas: correctAnswers + manuallyCorrect,
-            });
+                const snapshot = Array.isArray(attempt.preguntas_snapshot) ? attempt.preguntas_snapshot : [];
+                let ordered = snapshot;
+                if (ordered.length === 0) {
+                    const questions = await Question.findAll({
+                        where: { id_pregunta: { [Op.in]: attempt.preguntas } },
+                        transaction,
+                    });
+                    const byId = new Map(questions.map((question) => [String(question.id_pregunta), createQuestionSnapshot(question)]));
+                    ordered = attempt.preguntas.map((id) => byId.get(String(id))).filter(Boolean);
+                }
+                const answers = Array.isArray(attempt.respuestas) ? attempt.respuestas : [];
+                const allReviews = await OpenAnswerReview.findAll({ where: { id_intento: attemptId }, transaction });
+                const graded = scoreReviewedAttempt(ordered, answers, allReviews);
+                const finalScore = graded.score;
+                const pendingCount = graded.pendingManualReviews;
+                const confirmed = graded.status === 'confirmed';
+                const correctAnswers = graded.correctAnswers;
+                const priorResult = attempt.resultado_confirmado || {};
+                const resultVersion = confirmed ? 1 : null;
+                const confirmedAt = confirmed ? reviewedAt.toISOString() : null;
+                const resultSnapshot = {
+                    ...priorResult,
+                    score: finalScore,
+                    totalQuestions: ordered.length,
+                    correctAnswers,
+                    pendingManualReviews: pendingCount,
+                    requiresManualReview: pendingCount > 0,
+                    status: confirmed ? 'confirmed' : 'pending_review',
+                    resultVersion,
+                    confirmedAt,
+                };
+                await attempt.update({
+                    puntaje: finalScore,
+                    correctas: correctAnswers,
+                    resultado_confirmado: resultSnapshot,
+                }, { transaction });
 
-            return res.status(200).json({
-                success: true,
-                data: {
-                    review,
-                    intento: {
-                        id_intento: attempt.id_intento,
-                        puntaje: finalScore,
-                        correctas: correctAnswers + manuallyCorrect,
-                        total_preguntas: attempt.total_preguntas,
+                if (confirmed) {
+                    const event = {
+                        eventId: randomUUID(),
+                        type: 'ResultadoConfirmado.v1',
+                        schemaVersion: 1,
+                        producer: 'evaluation',
+                        correlationId: randomUUID(),
+                        occurredAt: reviewedAt.toISOString(),
+                        data: { attemptId: String(attempt.id_intento), userId: String(attempt.id_usuario), resultVersion: 1, status: 'confirmed' },
+                    };
+                    await ExamOutbox.create({
+                        event_id: event.eventId,
+                        aggregate_id: String(attempt.id_intento),
+                        event_type: event.type,
+                        payload: event,
+                    }, { transaction });
+                }
+
+                return {
+                    status: 200,
+                    body: {
+                        success: true,
+                        data: {
+                            review,
+                            intento: {
+                                id_intento: attempt.id_intento,
+                                puntaje: finalScore,
+                                correctas: correctAnswers,
+                                total_preguntas: ordered.length,
+                                estado_resultado: resultSnapshot.status,
+                                resultVersion,
+                            },
+                        },
                     },
-                },
+                };
             });
+            return res.status(result.status).json(result.body);
         } catch (error) {
             return next(error);
         }

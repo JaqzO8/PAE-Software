@@ -61,4 +61,25 @@ const scoreSnapshot = (snapshot, answers, now) => {
     };
 };
 
-module.exports = { createQuestionSnapshot, hashSubmission, scoreSnapshot };
+const scoreReviewedAttempt = (snapshot, answers, reviews) => {
+    const questions = Array.isArray(snapshot) ? snapshot : [];
+    const submittedAnswers = Array.isArray(answers) ? answers : [];
+    const openReviews = Array.isArray(reviews) ? reviews : [];
+    const correctMultipleChoice = questions.reduce((count, question, index) => (
+        count + (question.type === 'opcion_multiple' && submittedAnswers[index] === question.correctAnswer ? 1 : 0)
+    ), 0);
+    const reviewed = openReviews.filter((review) => review.estado === 'revisado');
+    const pendingManualReviews = openReviews.length - reviewed.length;
+    const manualPoints = reviewed.reduce((sum, review) => sum + Number(review.puntaje || 0), 0);
+    const manuallyCorrect = reviewed.filter((review) => Number(review.puntaje || 0) >= 3).length;
+    const earnedPoints = correctMultipleChoice * 5 + manualPoints;
+    return {
+        score: Math.round((earnedPoints / Math.max(questions.length * 5, 1)) * 100),
+        totalQuestions: questions.length,
+        correctAnswers: correctMultipleChoice + manuallyCorrect,
+        pendingManualReviews,
+        status: pendingManualReviews > 0 ? 'pending_review' : 'confirmed',
+    };
+};
+
+module.exports = { createQuestionSnapshot, hashSubmission, scoreSnapshot, scoreReviewedAttempt };

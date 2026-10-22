@@ -1,4 +1,4 @@
-const { createQuestionSnapshot, hashSubmission, scoreSnapshot } = require('../services/attemptRules');
+const { createQuestionSnapshot, hashSubmission, scoreSnapshot, scoreReviewedAttempt } = require('../services/attemptRules');
 
 describe('authoritative attempt rules', () => {
     const question = {
@@ -51,5 +51,23 @@ describe('authoritative attempt rules', () => {
         expect(result.score).toBe(0);
         expect(result.status).toBe('pending_review');
         expect(result.resultVersion).toBeNull();
+    });
+
+    test('confirms a result only after every open answer has an audited score', () => {
+        const snapshot = [
+            { type: 'opcion_multiple', correctAnswer: 1 },
+            { type: 'abierta', correctAnswer: -1 },
+        ];
+        const pending = scoreReviewedAttempt(snapshot, [1, 'respuesta'], [
+            { estado: 'revisado', puntaje: 4 },
+            { estado: 'pendiente', puntaje: null },
+        ]);
+        const confirmed = scoreReviewedAttempt(snapshot, [1, 'respuesta'], [
+            { estado: 'revisado', puntaje: 4 },
+        ]);
+
+        expect(pending.status).toBe('pending_review');
+        expect(pending.pendingManualReviews).toBe(1);
+        expect(confirmed).toMatchObject({ status: 'confirmed', score: 90, correctAnswers: 2, pendingManualReviews: 0 });
     });
 });

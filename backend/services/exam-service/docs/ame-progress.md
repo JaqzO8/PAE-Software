@@ -2,7 +2,7 @@
 
 Registro de ejecución de la especificación externa `03_SDD_Amelia_Evaluacion_Seguimiento.md`.
 Rama de trabajo: `Amelia_Mauricio`. Base verificada: `f8ea67709540b2e679f957e4bf9153fe0a7364dc`.
-Este registro describe evidencia observada; no afirma aceptación integral.
+Checkpoint de la vertical de intentos: `4731f6d`. Este registro describe evidencia observada; no afirma aceptación integral.
 
 ## Seguimiento por ticket
 
@@ -13,7 +13,7 @@ Este registro describe evidencia observada; no afirma aceptación integral.
 | AME-06, selección y snapshot | Aprobado | Parcial: inicio de simulacro guarda snapshot privado y fecha límite; la publicación, versionado del banco y rúbrica no están completos | Flujo de revisión/publicación docente y criterios académicos | Snapshot caracterizado por prueba unitaria; falta PostgreSQL |
 | AME-07, permisos y claves privadas | Aprobado | Parcial: endpoint limita la búsqueda al dueño del intento; la respuesta de inicio no incluye la clave | E01: sesión vigente, revocación y autorización docente por relación | Inspección de rutas/DTO; no se probó revocación real |
 | AME-08, cierre e idempotencia | Aprobado | Implementación: reloj del servidor, cierre transaccional con lock, hash de payload y replay estable; entrega vencida cierra con respuestas vacías; Outbox se escribe en la misma transacción para resultados sin revisión manual | Falta prueba real de PostgreSQL, caída entre commit/publicación y publicación/replay | `npm run test:exam` cubre hash/reglas; integración bloqueada por Docker apagado |
-| AME-09, revisión abierta y recalificación | Aprobado | Parcial heredado: respuestas abiertas quedan pendientes; auditoría, rúbrica versionada, exclusión entre revisores y contrato de recalificación pendientes | Acordar `ResultadoRevisado` y política de proyecciones/premios con José | No se declara cerrado |
+| AME-09, revisión abierta y recalificación | Aprobado | Parcial: revisión inicial ahora bloquea dobles revisores con transacción/lock y guarda auditoría versionada; al completar la cola confirma resultado y añade Outbox. Recalificación bloqueada con 409 hasta acordar contrato/política; rúbrica aún sin definición | Acordar rúbrica y `ResultadoRevisado`/proyecciones/premios con José; autorización por grupo con Richar | 1 prueba unitaria de transición pendiente→confirmado; concurrencia DB no ejecutada |
 | AME-10, banco y reportes | Aprobado / propuesto según historia | Parcial: se conserva el flujo existente; historial/versionado, selección reproducible, reportes y extensiones no están cerrados | Validación editorial y coordinación de Contenido | No se declara cerrado |
 | AME-11, integración de UI | Aprobado | Parcial: el cliente envía clave idempotente y usa la fecha límite recibida; el servidor calcula duración y aplica vencimiento | Sin sincronización de estado desde servidor al reconectar; sin recorrido funcional con DB | Build frontend exitoso |
 | AME-12–21, Seguimiento, eventos y tiempo real | Según estado individual en el SDD | Pendiente o parcial previo; esta entrega solo añade Outbox local durable | Contratos de Juan/José/Richar, consumidor autenticado y operación entre réplicas | No hay contrato de transporte operativo; no se activa proyección ni premio desde este Outbox |
