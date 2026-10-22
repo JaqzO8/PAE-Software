@@ -15,7 +15,7 @@ const {
     ExamOutbox,
 } = require('../models');
 const { sequelize } = require('../config/database');
-const { createQuestionSnapshot, hashSubmission, scoreSnapshot, scoreReviewedAttempt } = require('../services/attemptRules');
+const { createQuestionSnapshot, hashSubmission, scoreSnapshot, scoreReviewedAttempt, toPublicQuestion } = require('../services/attemptRules');
 const AchievementService = require('../services/achievementService');
 const GamificationService = require('../services/gamificationService');
 const { hasAlreadyAnswered } = require('../services/liveAnswerRules');
@@ -527,7 +527,24 @@ class LearningController {
 
             return res.status(200).json({
                 success: true,
-                data: attempts,
+                data: attempts.map((attempt) => ({
+                    id_intento: attempt.id_intento,
+                    dificultad: attempt.dificultad,
+                    estado: attempt.estado,
+                    estado_resultado: attempt.resultado_confirmado?.status || null,
+                    tiempo_usado: attempt.tiempo_usado,
+                    puntaje: attempt.puntaje,
+                    correctas: attempt.correctas,
+                    total_preguntas: attempt.total_preguntas,
+                    fecha_inicio: attempt.fecha_inicio,
+                    fecha_fin: attempt.fecha_fin,
+                    created_at: attempt.created_at || attempt.createdAt,
+                    universidad: attempt.universidad ? {
+                        id_universidad: attempt.universidad.id_universidad,
+                        slug: attempt.universidad.slug,
+                        nombre: attempt.universidad.nombre,
+                    } : null,
+                })),
             });
         } catch (error) {
             return next(error);
@@ -536,10 +553,16 @@ class LearningController {
 
     static async getLearningAnalytics(req, res, next) {
         try {
-            const settings = await getAnalyticsSettings();
             const isTeacherUser = req.user.rol === 'docente';
+            if (isTeacherUser) {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Las estadísticas de estudiantes requieren una relación docente-grupo vigente.',
+                });
+            }
+            const settings = await getAnalyticsSettings();
             const where = { estado: 'finalizado' };
-            if (!isTeacherUser) where.id_usuario = req.user.id;
+            where.id_usuario = req.user.id;
 
             const attempts = await SimulacroAttempt.findAll({
                 where,
@@ -755,7 +778,21 @@ class LearningController {
                 limit: 100,
             });
 
-            return res.status(200).json({ success: true, data: questions });
+            const isTeacher = req.user.rol === 'docente' || req.user.rol === 'admin';
+            const activeAttempts = await SimulacroAttempt.findAll({
+                where: { id_usuario: req.user.id, estado: 'en_progreso' },
+                attributes: ['preguntas'],
+            });
+            const activeQuestionIds = new Set(activeAttempts.flatMap((attempt) => (attempt.preguntas || []).map(String)));
+
+            return res.status(200).json({
+                success: true,
+                data: questions.map((question) => (
+                    !isTeacher || activeQuestionIds.has(String(question.id_pregunta))
+                        ? toPublicQuestion(question)
+                        : question
+                )),
+            });
         } catch (error) {
             return next(error);
         }
@@ -886,6 +923,10 @@ class LearningController {
 
     static async listOpenAnswerReviews(req, res, next) {
         try {
+            return res.status(403).json({
+                success: false,
+                message: 'La revisión requiere autorización docente por grupo; la integración de membresías aún no está disponible.',
+            });
             const { estado = 'pendiente' } = req.query;
             const where = {};
             if (estado !== 'all') where.estado = estado;
@@ -948,6 +989,10 @@ class LearningController {
 
     static async reviewOpenAnswer(req, res, next) {
         try {
+            return res.status(403).json({
+                success: false,
+                message: 'La revisión requiere autorización docente por grupo; la integración de membresías aún no está disponible.',
+            });
             const { attemptId, questionId } = req.params;
             const puntaje = Number(req.body.puntaje);
             const feedback = req.body.feedback || null;
@@ -1101,6 +1146,12 @@ class LearningController {
                 order: [['createdAt', 'DESC']],
             });
 
+            const activeAttempts = await SimulacroAttempt.findAll({
+                where: { id_usuario: req.user.id, estado: 'en_progreso' },
+                attributes: ['preguntas'],
+            });
+            const activeQuestionIds = new Set(activeAttempts.flatMap((attempt) => (attempt.preguntas || []).map(String)));
+
             return res.status(200).json({
                 success: true,
                 data: savedQuestions.map((saved) => ({
@@ -1108,7 +1159,9 @@ class LearningController {
                     id_usuario: saved.id_usuario,
                     id_pregunta: saved.id_pregunta,
                     created_at: saved.created_at || saved.createdAt,
-                    pregunta: saved.pregunta,
+                    pregunta: saved.pregunta && activeQuestionIds.has(String(saved.id_pregunta))
+                        ? toPublicQuestion(saved.pregunta)
+                        : saved.pregunta,
                 })),
             });
         } catch (error) {

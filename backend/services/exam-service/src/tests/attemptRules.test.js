@@ -1,4 +1,4 @@
-const { createQuestionSnapshot, hashSubmission, scoreSnapshot, scoreReviewedAttempt } = require('../services/attemptRules');
+const { createQuestionSnapshot, hashSubmission, scoreSnapshot, scoreReviewedAttempt, toPublicQuestion } = require('../services/attemptRules');
 
 describe('authoritative attempt rules', () => {
     const question = {
@@ -22,6 +22,21 @@ describe('authoritative attempt rules', () => {
 
         expect(snapshot).toMatchObject({ id: '42', prompt: '¿Cuánto es 6 × 7?', correctAnswer: 1, version: expect.any(String) });
         expect(snapshot).not.toHaveProperty('respuesta_correcta');
+    });
+
+    test('removes answer keys and explanations from public question DTOs', () => {
+        const dto = toPublicQuestion({
+            id_pregunta: 1,
+            respuesta_correcta: 2,
+            respuesta_texto: 'clave',
+            explicacion: 'razón',
+            enunciado: 'Pregunta',
+        });
+
+        expect(dto).toMatchObject({ id_pregunta: 1, enunciado: 'Pregunta' });
+        expect(dto).not.toHaveProperty('respuesta_correcta');
+        expect(dto).not.toHaveProperty('respuesta_texto');
+        expect(dto).not.toHaveProperty('explicacion');
     });
 
     test('uses snapshot answers and leaves cohort percentile undefined', () => {

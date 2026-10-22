@@ -19,6 +19,12 @@ const hashSubmission = (answers) => crypto
     .update(JSON.stringify(Array.isArray(answers) ? answers : []))
     .digest('hex');
 
+const toPublicQuestion = (question) => {
+    const dto = typeof question?.toJSON === 'function' ? question.toJSON() : { ...question };
+    for (const field of ['respuesta_correcta', 'respuesta_texto', 'correctAnswer', 'answerText', 'explicacion', 'explanation']) delete dto[field];
+    return dto;
+};
+
 const scoreSnapshot = (snapshot, answers, now) => {
     const questions = Array.isArray(snapshot) ? snapshot : [];
     const submittedAnswers = Array.isArray(answers) ? answers : [];
@@ -82,4 +88,4 @@ const scoreReviewedAttempt = (snapshot, answers, reviews) => {
     };
 };
 
-module.exports = { createQuestionSnapshot, hashSubmission, scoreSnapshot, scoreReviewedAttempt };
+module.exports = { createQuestionSnapshot, hashSubmission, scoreSnapshot, scoreReviewedAttempt, toPublicQuestion };
