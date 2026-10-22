@@ -2,7 +2,7 @@
 
 Registro de ejecución de la especificación externa `03_SDD_Amelia_Evaluacion_Seguimiento.md`.
 Rama de trabajo: `Amelia_Mauricio`. Base verificada: `f8ea67709540b2e679f957e4bf9153fe0a7364dc`.
-Checkpoints locales: intentos `4731f6d`, auditoría de revisión `48eef01`, DTOs privados `6347f80`. Este registro describe evidencia observada; no afirma aceptación integral.
+Checkpoints locales: intentos `4731f6d`, auditoría de revisión `48eef01`, DTOs privados `e0a65c3`. Este registro describe evidencia observada; no afirma aceptación integral.
 
 ## Seguimiento por ticket
 
