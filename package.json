@@ -20,6 +20,6 @@
     "test:learning": "npm test --prefix backend/services/learning-service",
     "test:docker": "node scripts/test-docker-architecture.mjs",
     "test:auth": "node --test tests/auth/roleSecurity.test.cjs tests/auth/mfaFlow.test.cjs tests/auth/passwordResetRace.test.cjs tests/auth/publicUsersDto.test.cjs tests/auth/sessionRevocationCrossService.test.cjs",
-    "test:m8": "node --test tests/m8/platformPreferences.test.cjs"
+    "test:m8": "node --test tests/m8/platformPreferences.test.cjs tests/m8/notificationTransport.test.cjs tests/m8/backupRestore.test.cjs tests/m8/accessibilityAudit.test.cjs tests/m8/infrastructureSecurity.test.cjs"
   }
 }

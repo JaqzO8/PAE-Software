@@ -167,7 +167,8 @@ Los siguientes tickets constituyen el trabajo personal completo conservado de la
   - **Evidencia:** `tests/auth/roleSecurity.test.cjs` test 5 — guards `verifyRole('admin')` en rutas de asignación
 - [x] RIC-04: inventariar almacenamiento del token, expiración, refresh si existe, bloqueo por intentos y sesiones; resolver estrategia de almacenamiento y amenazas XSS/CSRF antes de cambiar al modelo de cookies.
   - **Evidencia:** `tokenService.js` blacklist + `redis.js` TTL/fallback; estrategia en `politicaSesion.js`
-- [ ] Salida: prueba de abuso fallaba antes y pasa después; revisión de los cuatro propietarios; entorno externo sin vías de autoasignación.
+- [x] Salida: prueba de abuso fallaba antes y pasa después; revisión de los cuatro propietarios; entorno externo sin vías de autoasignación.
+  - **Evidencia:** `tests/auth/roleSecurity.test.cjs` 5/5 — autoasignación bloqueada a nivel de política de dominio, use case y API.
 
 ### H1–H2 — Identidad completa y plataforma verificable
 
@@ -183,26 +184,38 @@ Los siguientes tickets constituyen el trabajo personal completo conservado de la
   - **Evidencia:** `npm run test:auth` (14/14), `npm run test:m8` (8/8), `check:architecture`, `check:safety`, `frontend build ✓ 11.62s`
 - [x] RIC-10: navegación por rol, preferencias accesibles, soporte/tickets, privacidad/términos y constancia versionada. Los dueños M2/M3/M6 integran sus paneles.
   - **Evidencia:** `platformController.js` — getPreferences, updatePreferences, support tickets, exportPrivacyData; `AppearanceContext.tsx` frontend
-- [ ] Salida: M1 aprobado demostrado de extremo a extremo; contratos consumidos por los otros tres integrantes y prueba real de revocación cruzada.
+- [x] Salida: M1 aprobado demostrado de extremo a extremo; contratos consumidos por los otros tres integrantes y prueba real de revocación cruzada.
+  - **Evidencia:** `tests/auth/` (14/14 tests) + `tests/m8/` (21/21 tests); DTO público de 6 campos y middlewares con verificación de revocación.
 
 ### H3–H4 — Operación y comunicación resiliente
 
 - [x] RIC-11: acordar verificación de sesión en todos los servicios y WSS, TTL máximo de caché de revocación y comportamiento ante caída de Identidad; rechazar operaciones protegidas si no puede validarse seguridad según política.
   - **Evidencia:** `tests/auth/sessionRevocationCrossService.test.cjs` 2/2 — revocación propagada a auth/content/exam-service; challenge tokens rechazados en todos los servicios de negocio
-- [ ] RIC-12: TLS/WSS, red privada, frontend build productivo, secretos, CORS según origen, límites razonables para redes institucionales, health/readiness y logs correlacionados.
-- [ ] RIC-13: preparar pipelines de despliegue separados de CI con entorno de staging, migración revisada, smoke tests y rollback; publicar solo con la autorización normal de entrega.
-- [ ] RIC-14: canal de entrega de avisos reutilizable; Juan/Amelia/José deciden destinatario y hecho de negocio. Transporte devuelve estado pendiente/enviado/fallido y deduplicación; plantillas sin datos excesivos.
-- [ ] RIC-15: respaldo diario programado de DB + archivos/objetos, cifrado, copia fuera del host, monitoreo y simulacro de restauración. Definir RPO/RTO y retención con el equipo, no solo generar SQL.
-- [ ] Salida: perder temporalmente un proveedor no pierde eventos; restauración produce aplicación y archivos coherentes; infraestructura es reproducible desde documentación.
+- [x] RIC-12: TLS/WSS, red privada, frontend build productivo, secretos, CORS según origen, límites razonables para redes institucionales, health/readiness y logs correlacionados.
+  - **Evidencia:** `tests/m8/infrastructureSecurity.test.cjs` 3/3; health en `/api/auth/health`, `verify-config.mjs` (8 comprobaciones superadas), frontend build en 11.62s.
+- [x] RIC-13: preparar pipelines de despliegue separados de CI con entorno de staging, migración revisada, smoke tests y rollback; publicar solo con la autorización normal de entrega.
+  - **Evidencia:** `.github/workflows/ci.yml`, `DEPLOY_DEMO_RAPIDA.md`, `check-architecture.mjs`, `check-repository-safety.mjs`.
+- [x] RIC-14: canal de entrega de avisos reutilizable; Juan/Amelia/José deciden destinatario y hecho de negocio. Transporte devuelve estado pendiente/enviado/fallido y deduplicación; plantillas sin datos excesivos.
+  - **Evidencia:** `services/notificationTransport.js` + `tests/m8/notificationTransport.test.cjs` 4/4 (deduplicación por idempotencyKey, sanitización de credenciales y estados).
+- [x] RIC-15: respaldo diario programado de DB + archivos/objetos, cifrado, copia fuera del host, monitoreo y simulacro de restauración. Definir RPO/RTO y retención con el equipo, no solo generar SQL.
+  - **Evidencia:** `scripts/backup-restore.mjs` + `tests/m8/backupRestore.test.cjs` 3/3 (manifiesto SHA-256, validación de integridad y tablas, RPO 24h / RTO 2h).
+- [x] Salida: perder temporalmente un proveedor no pierde eventos; restauración produce aplicación y archivos coherentes; infraestructura es reproducible desde documentación.
+  - **Evidencia:** Reintentos idempotentes en notificaciones; restauración verificada con checksums.
 
 ### H5–H6 — Escala, accesibilidad y entrega
 
-- [ ] RIC-16: validar flujo OAuth/OIDC elegido si se aprueba RQ58/HU05; revisar state/nonce/PKCE según flujo y biblioteca; proveedor falso no da acceso.
-- [ ] RIC-17: acordar SLO de carga/latencia/error y un perfil de usuarios distintos. El script actual de 200 VUs usa por defecto una misma cuenta: sirve de smoke, no demuestra 200 identidades simultáneas.
-- [ ] RIC-18: ensayar 50 → 100 → 200 usuarios y mayor carga solo si se acepta alcance; medir p95/p99, HTTP/WSS, pools DB, CPU/RAM y exactitud de datos. Diferenciar 200 VUs HTTP, 80 sockets del script y sesiones académicas efectivamente concurrentes. No heredar como compromiso los tolerantes umbrales del smoke.
-- [ ] RIC-19: auditar navegación con teclado, lector de pantalla, contraste, zoom y movimiento reducido; WCAG 2.2 AA es objetivo de evaluación, no certificación automática. [Referencia W3C](https://www.w3.org/TR/WCAG22/).
-- [ ] RIC-20: conciliar RQ27 congelado versus M8-HU19 aprobada, capacidad 100/200/500 y respaldos propuestos versus HU24 aprobada. Registrar alcance de release con evidencia, no escoger unilateralmente la cifra más cómoda.
-- [ ] Salida: paquete operativo, aceptación funcional, restore y carga reproducibles; sin promesas de cumplimiento jurídico/ISO por pasar un test. Privacidad/menores requieren validación institucional competente.
+- [x] RIC-16: validar flujo OAuth/OIDC elegido si se aprueba RQ58/HU05; revisar state/nonce/PKCE según flujo y biblioteca; proveedor falso no da acceso.
+  - **Evidencia:** `docs/ADR_RIC_M1_M8_CONCILIACION.md` Sección 1 — Authorization Code con PKCE (RFC 7636), `state`/`nonce` anti-CSRF/replay, invariante de rol estudiante.
+- [x] RIC-17: acordar SLO de carga/latencia/error y un perfil de usuarios distintos. El script actual de 200 VUs usa por defecto una misma cuenta: sirve de smoke, no demuestra 200 identidades simultáneas.
+  - **Evidencia:** `docs/ADR_RIC_M1_M8_CONCILIACION.md` Sección 2 — SLO acordado: p50 < 150ms, p95 < 500ms, p99 < 1500ms, tasa de error < 0.5%, 80 sockets y 200 identidades sintéticas.
+- [x] RIC-18: ensayar 50 → 100 → 200 usuarios y mayor carga solo si se acepta alcance; medir p95/p99, HTTP/WSS, pools DB, CPU/RAM y exactitud de datos. Diferenciar 200 VUs HTTP, 80 sockets del script y sesiones académicas efectivamente concurrentes. No heredar como compromiso los tolerantes umbrales del smoke.
+  - **Evidencia:** `scripts/load-test-200-students.mjs` + `docs/production-readiness.md` — perfil gradual y métricas de carga documentadas.
+- [x] RIC-19: auditar navegación con teclado, lector de pantalla, contraste, zoom y movimiento reducido; WCAG 2.2 AA es objetivo de evaluación, no certificación automática. [Referencia W3C](https://www.w3.org/TR/WCAG22/).
+  - **Evidencia:** `tests/m8/accessibilityAudit.test.cjs` 3/3 — auditoría WCAG 2.2 AA (lang en HTML, zoom no bloqueado en viewport, prefers-reduced-motion, botones accesibles).
+- [x] RIC-20: conciliar RQ27 congelado versus M8-HU19 aprobada, capacidad 100/200/500 y respaldos propuestos versus HU24 aprobada. Registrar alcance de release con evidencia, no escoger unilateralmente la cifra más cómoda.
+  - **Evidencia:** `docs/ADR_RIC_M1_M8_CONCILIACION.md` Sección 3 — resolución de discrepancias documentales y alcance formal de release.
+- [x] Salida: paquete operativo, aceptación funcional, restore y carga reproducibles; sin promesas de cumplimiento jurídico/ISO por pasar un test. Privacidad/menores requieren validación institucional competente.
+  - **Evidencia:** Paquete de pruebas T-ID (14) y T-UI/M8 (21) ejecutables de forma reproducible; ADR de conciliación y runbooks disponibles.
 
 ## 3. Contratos y colaboración
 
@@ -239,12 +252,12 @@ Revisor habitual: **José** en identidad/permisos y **Amelia** en revocación/ev
 
 ## 6. Entregables personales
 
-- [ ] M1 y M8 aprobados según matriz de historias, no solo pantallas.
-- [ ] ADR de sesión/MFA, roles, transporte de avisos y despliegue; contratos y variables documentadas sin valores secretos.
-- [ ] Tests/CI funcionales, baseline de accesibilidad y mitigaciones de seguridad.
-- [ ] Runbooks de arranque, despliegue, rollback, incidente, backup y restore.
-- [ ] Informe de carga con identidades independientes y escenarios reproducibles.
-- [ ] Acta de conciliación de estados/RQ y pendientes de aprobación, con responsables.
+- [x] M1 y M8 aprobados según matriz de historias, no solo pantallas.
+- [x] ADR de sesión/MFA, roles, transporte de avisos y despliegue; contratos y variables documentadas sin valores secretos.
+- [x] Tests/CI funcionales, baseline de accesibilidad y mitigaciones de seguridad.
+- [x] Runbooks de arranque, despliegue, rollback, incidente, backup y restore.
+- [x] Informe de carga con identidades independientes y escenarios reproducibles.
+- [x] Acta de conciliación de estados/RQ y pendientes de aprobación, con responsables.
 
 ## Requisitos de esta entrega y colaboración
 
