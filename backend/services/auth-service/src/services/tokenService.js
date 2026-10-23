@@ -14,6 +14,17 @@ class TokenService {
     }
 
     /**
+     * Genera un token de desafío MFA de alcance restringido (RIC-06, RIC-AC-02)
+     */
+    static generateChallengeToken(payload) {
+        return jwt.sign(
+            { ...payload, scope: 'mfa_challenge', jti: crypto.randomUUID() },
+            config.JWT_SECRET,
+            { expiresIn: '5m' }
+        );
+    }
+
+    /**
      * Genera un refresh token
      */
     static generateRefreshToken(payload) {
@@ -25,7 +36,7 @@ class TokenService {
     /**
      * Verifica y decodifica un token
      */
-    static async verifyToken(token) {
+    static async verifyToken(token, { allowChallenge = false } = {}) {
         try {
             // Verificar si el token está en la blacklist
             const blacklisted = await isBlacklisted(token);
@@ -35,6 +46,15 @@ class TokenService {
 
             // Verificar el token
             const decoded = jwt.verify(token, config.JWT_SECRET);
+
+            // Tokens de desafío MFA no tienen acceso a rutas normales
+            if (!allowChallenge && decoded.scope === 'mfa_challenge') {
+                return {
+                    valid: false,
+                    error: 'Token de alcance restringido: debe completar la verificación de dos factores',
+                };
+            }
+
             return { valid: true, decoded };
         } catch (error) {
             if (error.name === 'TokenExpiredError') {
@@ -46,6 +66,7 @@ class TokenService {
             return { valid: false, error: error.message };
         }
     }
+
 
     /**
      * Revoca un token añadiéndolo a la blacklist

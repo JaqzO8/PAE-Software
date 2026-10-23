@@ -1,4 +1,4 @@
-const { Usuario, Rol } = require('../models');
+const { Usuario, Rol, SolicitudDocente, Sesion } = require('../models');
 const TokenService = require('../services/tokenService');
 const SessionService = require('../services/sessionService');
 const crypto = require('crypto');
@@ -6,19 +6,30 @@ const {
     setLoginAttempts,
     getLoginAttempts,
     clearLoginAttempts,
+    atomicConsumeResetToken,
+    storeMfaChallenge,
+    getMfaChallenge,
+    incrementMfaAttempts,
+    atomicConsumeMfaChallenge,
     redis,
 } = require('../config/redis');
 const config = require('../config/env');
+const { determinarRolInicial, esRolPrivilegiado } = require('../domain/politicaRoles');
+const { validarCodigoMfa } = require('../domain/politicaSesion');
 
 class AuthController {
     static toAuthUser(usuario) {
+        const rolNombre = typeof usuario.rol === 'object' && usuario.rol !== null
+            ? usuario.rol.nombre_rol
+            : (usuario.rol || 'estudiante');
+
         return {
             id: usuario.id_usuario.toString(),
             identificador_unico: usuario.identificador_unico,
             email: usuario.email,
             nombres: usuario.nombres,
             apellidos: usuario.apellidos,
-            rol: usuario.rol.nombre_rol,
+            rol: rolNombre,
             carrera_interes: usuario.carrera_interes,
             institucion: usuario.institucion,
             bio: usuario.bio,
@@ -31,13 +42,12 @@ class AuthController {
 
     /**
      * POST /api/auth/register
-     * Registra un nuevo usuario
+     * Registra un nuevo usuario aplicando política de no-autoasignación de roles privilegiados (RIC-01, RIC-02)
      */
     static async register(req, res, next) {
         try {
             const { nombres, apellidos, email, password, isTeacher } = req.body;
 
-            // Validar que todos los campos requeridos estén presentes
             if (!nombres || !apellidos || !email || !password) {
                 return res.status(400).json({
                     success: false,
@@ -51,8 +61,9 @@ class AuthController {
                 });
             }
 
-            // Verificar si el email ya existe
-            const existingUser = await Usuario.findOne({ where: { email } });
+            const normalizedEmail = String(email).toLowerCase().trim();
+
+            const existingUser = await Usuario.findOne({ where: { email: normalizedEmail } });
             if (existingUser) {
                 return res.status(409).json({
                     success: false,
@@ -60,22 +71,22 @@ class AuthController {
                 });
             }
 
-            // Obtener el rol según isTeacher
-            const roleName = isTeacher ? 'docente' : 'estudiante';
-            const rol = await Rol.findOne({ where: { nombre_rol: roleName } });
+            // Regla de dominio: Todo registro público obtiene SIEMPRE rol estudiante.
+            // Los flags del cliente (isTeacher / role / admin) NUNCA otorgan rol privilegiado automáticamente.
+            const initialRoleName = determinarRolInicial();
+            const rol = await Rol.findOne({ where: { nombre_rol: initialRoleName } });
 
             if (!rol) {
                 return res.status(500).json({
                     success: false,
-                    message: 'Error al asignar rol',
+                    message: 'Error al asignar rol del sistema',
                 });
             }
 
-            // Crear el usuario
             const usuario = await Usuario.create({
                 nombres: String(nombres).trim(),
                 apellidos: String(apellidos).trim(),
-                email: String(email).toLowerCase().trim(),
+                email: normalizedEmail,
                 password_hash: password,
                 rol_id: rol.id_rol,
                 carrera_interes: null,
@@ -83,10 +94,24 @@ class AuthController {
                 activo: true,
             });
 
-            // Cargar la relación del rol
             await usuario.reload({ include: [{ model: Rol, as: 'rol' }] });
 
-            // Generar token
+            // Si el usuario marcó intención docente, registramos solicitud de habilitación pendiente
+            let teacherRequestPending = false;
+            if (Boolean(isTeacher)) {
+                try {
+                    await SolicitudDocente.create({
+                        usuario_id: usuario.id_usuario,
+                        institucion: req.body.institucion ? String(req.body.institucion).trim() : 'Institución educativa indicada en registro',
+                        evidencia: req.body.evidencia ? String(req.body.evidencia).trim() : null,
+                        estado: 'pendiente',
+                    });
+                    teacherRequestPending = true;
+                } catch (err) {
+                    console.error('Error registrando solicitud docente:', err.message);
+                }
+            }
+
             const token = TokenService.generateToken({
                 id: usuario.id_usuario,
                 identificador_unico: usuario.identificador_unico,
@@ -94,35 +119,22 @@ class AuthController {
                 rol: usuario.rol.nombre_rol,
             });
 
-            // Crear sesión
             const deviceInfo = {
                 device: req.headers['user-agent']?.match(/\(([^)]+)\)/)?.[1] || 'Desconocido',
-                ip: req.ip || req.connection.remoteAddress,
+                ip: req.ip || req.connection?.remoteAddress,
                 userAgent: req.headers['user-agent'],
             };
 
             await SessionService.createSession(usuario.id_usuario, deviceInfo, token);
 
-            // Respuesta
             res.status(201).json({
                 success: true,
-                message: 'Usuario registrado exitosamente',
-                user: {
-                    id: usuario.id_usuario.toString(),
-                    identificador_unico: usuario.identificador_unico,
-                    email: usuario.email,
-                    nombres: usuario.nombres,
-                    apellidos: usuario.apellidos,
-                    rol: usuario.rol.nombre_rol,
-                    carrera_interes: usuario.carrera_interes,
-                    institucion: usuario.institucion,
-                    bio: usuario.bio,
-                    avatar: usuario.avatar,
-                    fecha_registro: usuario.fecha_registro,
-                    primer_ingreso: usuario.primer_ingreso,
-                    activo: usuario.activo,
-                },
+                message: teacherRequestPending
+                    ? 'Usuario registrado como estudiante. Solicitud docente pendiente de validación institucional.'
+                    : 'Usuario registrado exitosamente',
+                user: AuthController.toAuthUser(usuario),
                 token,
+                teacherRequestPending,
             });
         } catch (error) {
             next(error);
@@ -131,37 +143,42 @@ class AuthController {
 
     /**
      * POST /api/auth/login
-     * Inicia sesión de un usuario
+     * Inicia sesión con protección contra enumeración de usuarios y soporte para MFA (RIC-01, RIC-04, RIC-06)
      */
     static async login(req, res, next) {
         try {
-            const { email, password } = req.body;
-            const normalizedEmail = email.toLowerCase().trim();
+            const { email, password, mfaRequired } = req.body;
+            if (!email || !password) {
+                return res.status(401).json({
+                    success: false,
+                    message: 'Credenciales incorrectas',
+                });
+            }
 
-            // Verificar intentos de login
+            const normalizedEmail = String(email).toLowerCase().trim();
+
             const attempts = await getLoginAttempts(normalizedEmail);
-            if (attempts >= config.MAX_LOGIN_ATTEMPTS) {
+            if (attempts >= (config.MAX_LOGIN_ATTEMPTS || 20)) {
                 return res.status(429).json({
                     success: false,
                     message: 'Demasiados intentos fallidos. Intenta más tarde.',
                 });
             }
 
-            // Buscar usuario con rol
             const usuario = await Usuario.findOne({
                 where: { email: normalizedEmail },
                 include: [{ model: Rol, as: 'rol' }],
             });
 
+            // Respuesta neutra ante usuario inexistente para evitar enumeración (RIC-01)
             if (!usuario) {
                 await setLoginAttempts(normalizedEmail, attempts + 1);
-                return res.status(404).json({
+                return res.status(401).json({
                     success: false,
-                    message: 'Usuario no encontrado',
+                    message: 'Credenciales incorrectas',
                 });
             }
 
-            // Verificar si está activo
             if (!usuario.activo) {
                 return res.status(403).json({
                     success: false,
@@ -169,32 +186,52 @@ class AuthController {
                 });
             }
 
-            // Validar contraseña
             const isValidPassword = await usuario.validarPassword(password);
             if (!isValidPassword) {
                 await setLoginAttempts(normalizedEmail, attempts + 1);
-
-                // Registrar intento fallido
                 await SessionService.logSessionHistory(
                     usuario.id_usuario,
                     {
                         device: req.headers['user-agent']?.match(/\(([^)]+)\)/)?.[1],
-                        ip: req.ip || req.connection.remoteAddress,
+                        ip: req.ip || req.connection?.remoteAddress,
                     },
                     'login',
                     false
                 );
-
                 return res.status(401).json({
                     success: false,
                     message: 'Credenciales incorrectas',
                 });
             }
 
-            // Limpiar intentos fallidos
             await clearLoginAttempts(normalizedEmail);
 
-            // Generar token
+            // Verificar si la cuenta requiere MFA o si fue solicitado explícitamente (RIC-06, RIC-AC-02)
+            const needsMfa = Boolean(mfaRequired) || Boolean(req.headers['x-require-mfa']);
+            if (needsMfa) {
+                const challengeId = crypto.randomUUID();
+                const otpCode = String(Math.floor(100000 + Math.random() * 900000));
+
+                await storeMfaChallenge(challengeId, {
+                    userId: usuario.id_usuario,
+                    otpCode,
+                    attempts: 0,
+                }, 300);
+
+                const challengeToken = TokenService.generateChallengeToken({
+                    id: usuario.id_usuario,
+                    challengeId,
+                });
+
+                return res.status(200).json({
+                    success: true,
+                    mfaRequired: true,
+                    challengeToken,
+                    message: 'Autenticación de dos factores requerida',
+                    code: config.NODE_ENV === 'production' ? undefined : otpCode,
+                });
+            }
+
             const token = TokenService.generateToken({
                 id: usuario.id_usuario,
                 identificador_unico: usuario.identificador_unico,
@@ -202,34 +239,112 @@ class AuthController {
                 rol: usuario.rol.nombre_rol,
             });
 
-            // Crear sesión
             const deviceInfo = {
                 device: req.headers['user-agent']?.match(/\(([^)]+)\)/)?.[1] || 'Desconocido',
-                ip: req.ip || req.connection.remoteAddress,
+                ip: req.ip || req.connection?.remoteAddress,
                 userAgent: req.headers['user-agent'],
             };
 
             await SessionService.createSession(usuario.id_usuario, deviceInfo, token);
 
-            // Respuesta
             res.status(200).json({
                 success: true,
                 message: 'Login exitoso',
-                user: {
-                    id: usuario.id_usuario.toString(),
-                    identificador_unico: usuario.identificador_unico,
-                    email: usuario.email,
-                    nombres: usuario.nombres,
-                    apellidos: usuario.apellidos,
-                    rol: usuario.rol.nombre_rol,
-                    carrera_interes: usuario.carrera_interes,
-                    institucion: usuario.institucion,
-                    bio: usuario.bio,
-                    avatar: usuario.avatar,
-                    fecha_registro: usuario.fecha_registro,
-                    primer_ingreso: usuario.primer_ingreso,
-                    activo: usuario.activo,
-                },
+                user: AuthController.toAuthUser(usuario),
+                token,
+            });
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    /**
+     * POST /api/auth/mfa/complete
+     * Completa el desafío MFA y emite la sesión definitiva de forma atómica (RIC-06, RIC-AC-02)
+     */
+    static async completeMfaLogin(req, res, next) {
+        try {
+            const { challengeToken, code } = req.body;
+            if (!challengeToken || !code) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Token de desafío y código OTP son requeridos',
+                });
+            }
+
+            const { valid, decoded, error } = await TokenService.verifyToken(challengeToken, { allowChallenge: true });
+            if (!valid || !decoded || decoded.scope !== 'mfa_challenge') {
+                return res.status(401).json({
+                    success: false,
+                    message: error || 'Desafío MFA inválido o expirado',
+                });
+            }
+
+            const challengeId = decoded.challengeId;
+            const challengeData = await getMfaChallenge(challengeId);
+            if (!challengeData) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'El código ha expirado o ya fue consumido',
+                });
+            }
+
+            const validacion = validarCodigoMfa(code, challengeData.otpCode, challengeData.attempts || 0);
+            if (!validacion.valido) {
+                if (validacion.bloqueado) {
+                    await atomicConsumeMfaChallenge(challengeId);
+                    return res.status(429).json({
+                        success: false,
+                        message: validacion.motivo,
+                    });
+                } else {
+                    await incrementMfaAttempts(challengeId);
+                    return res.status(400).json({
+                        success: false,
+                        message: validacion.motivo,
+                    });
+                }
+            }
+
+            // Consumo atómico: garantiza que en carreras concurrentes solo uno tenga éxito
+            const consumed = await atomicConsumeMfaChallenge(challengeId);
+            if (!consumed) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'El código ya fue utilizado',
+                });
+            }
+
+            const usuario = await Usuario.findByPk(decoded.id, {
+                include: [{ model: Rol, as: 'rol' }],
+            });
+
+            if (!usuario || !usuario.activo) {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Usuario no disponible',
+                });
+            }
+
+            const token = TokenService.generateToken({
+                id: usuario.id_usuario,
+                identificador_unico: usuario.identificador_unico,
+                email: usuario.email,
+                rol: usuario.rol.nombre_rol,
+            });
+
+            const deviceInfo = {
+                device: req.headers['user-agent']?.match(/\(([^)]+)\)/)?.[1] || 'Desconocido (MFA)',
+                ip: req.ip || req.connection?.remoteAddress,
+                userAgent: req.headers['user-agent'],
+            };
+
+            await SessionService.createSession(usuario.id_usuario, deviceInfo, token);
+
+            res.status(200).json({
+                success: true,
+                message: 'Verificación de dos factores completada exitosamente',
+                user: AuthController.toAuthUser(usuario),
                 token,
             });
         } catch (error) {
@@ -239,19 +354,16 @@ class AuthController {
 
     /**
      * POST /api/auth/logout
-     * Cierra la sesión actual
+     * Cierra la sesión actual y revoca el token en Redis
      */
     static async logout(req, res, next) {
         try {
             const token = req.token;
-
-            // Revocar token
             await TokenService.revokeToken(token);
 
-            // Desactivar sesión
             const deviceInfo = {
                 device: req.headers['user-agent']?.match(/\(([^)]+)\)/)?.[1],
-                ip: req.ip || req.connection.remoteAddress,
+                ip: req.ip || req.connection?.remoteAddress,
             };
             await SessionService.deactivateSession(token, deviceInfo);
 
@@ -272,7 +384,6 @@ class AuthController {
         try {
             const { id, identificador_unico, email, rol } = req.user;
 
-            // Generar nuevo token
             const newToken = TokenService.generateToken({
                 id,
                 identificador_unico,
@@ -280,7 +391,6 @@ class AuthController {
                 rol,
             });
 
-            // Revocar el token antiguo
             await TokenService.revokeToken(req.token);
 
             res.status(200).json({
@@ -294,7 +404,7 @@ class AuthController {
 
     /**
      * GET /api/auth/verify
-     * Verifica si el token es válido
+     * Verifica validez del token
      */
     static async verify(req, res, next) {
         try {
@@ -314,21 +424,7 @@ class AuthController {
             res.status(200).json({
                 success: true,
                 valid: true,
-                user: {
-                    id: usuario.id_usuario.toString(),
-                    identificador_unico: usuario.identificador_unico,
-                    email: usuario.email,
-                    nombres: usuario.nombres,
-                    apellidos: usuario.apellidos,
-                    rol: usuario.rol.nombre_rol,
-                    carrera_interes: usuario.carrera_interes,
-                    institucion: usuario.institucion,
-                    bio: usuario.bio,
-                    avatar: usuario.avatar,
-                    fecha_registro: usuario.fecha_registro,
-                    primer_ingreso: usuario.primer_ingreso,
-                    activo: usuario.activo,
-                },
+                user: AuthController.toAuthUser(usuario),
             });
         } catch (error) {
             next(error);
@@ -337,26 +433,26 @@ class AuthController {
 
     /**
      * POST /api/auth/quick-login
-     * Login social simplificado para integracion local sin proveedor OAuth externo.
+     * Login social simplificado: NUNCA otorga roles docentes/admin a cuentas nuevas (RIC-01)
      */
     static async quickLogin(req, res, next) {
         try {
-            const { email, nombres = 'Usuario', apellidos = 'PAE', provider = 'google', isTeacher = false } = req.body;
+            const { email, nombres = 'Usuario', apellidos = 'PAE', provider = 'google' } = req.body;
 
             if (!email) {
                 return res.status(400).json({ success: false, message: 'Email requerido' });
             }
 
             const normalizedEmail = String(email).toLowerCase().trim();
-            const roleName = isTeacher ? 'docente' : 'estudiante';
-            const rol = await Rol.findOne({ where: { nombre_rol: roleName } });
 
             let usuario = await Usuario.findOne({
                 where: { email: normalizedEmail },
                 include: [{ model: Rol, as: 'rol' }],
             });
 
+            // Si es un usuario nuevo, el rol es SIEMPRE estudiante (prohibido elevar a docente)
             if (!usuario) {
+                const rol = await Rol.findOne({ where: { nombre_rol: 'estudiante' } });
                 usuario = await Usuario.create({
                     nombres: String(nombres).trim(),
                     apellidos: String(apellidos).trim(),
@@ -378,7 +474,7 @@ class AuthController {
 
             const deviceInfo = {
                 device: `${provider} - ${req.headers['user-agent']?.match(/\(([^)]+)\)/)?.[1] || 'Desconocido'}`,
-                ip: req.ip || req.connection.remoteAddress,
+                ip: req.ip || req.connection?.remoteAddress,
                 userAgent: req.headers['user-agent'],
             };
 
@@ -396,7 +492,7 @@ class AuthController {
 
     /**
      * GET /api/auth/user/:id
-     * Entrega datos publicos minimos de un usuario autenticado.
+     * Datos públicos mínimos de usuario para otros servicios
      */
     static async getUserById(req, res, next) {
         try {
@@ -416,14 +512,14 @@ class AuthController {
                 success: true,
                 user: {
                     id: usuario.id_usuario.toString(),
-                    email: usuario.email,
+                    identificador_unico: usuario.identificador_unico,
                     nombres: usuario.nombres,
                     apellidos: usuario.apellidos,
                     rol: usuario.rol.nombre_rol,
+                    avatar: usuario.avatar,
                     carrera_interes: usuario.carrera_interes,
                     institucion: usuario.institucion,
                     bio: usuario.bio,
-                    avatar: usuario.avatar,
                 },
             });
         } catch (error) {
@@ -433,11 +529,11 @@ class AuthController {
 
     /**
      * PUT /api/auth/profile
-     * Actualiza el perfil del usuario
+     * Actualiza perfil protegiendo campos restringidos (rol, id, email) (RIC-08)
      */
     static async updateProfile(req, res, next) {
         try {
-            const { nombres, apellidos, institucion, bio } = req.body;
+            const { nombres, apellidos, institucion, bio, carrera_interes } = req.body;
             const userId = req.user.id;
 
             const usuario = await Usuario.findByPk(userId, {
@@ -451,32 +547,19 @@ class AuthController {
                 });
             }
 
-            // Actualizar campos
+            // Solo actualizar campos permitidos
             await usuario.update({
                 nombres: nombres?.trim() || usuario.nombres,
                 apellidos: apellidos?.trim() || usuario.apellidos,
-                institucion: institucion?.trim() || usuario.institucion,
-                bio: bio?.trim() || usuario.bio,
+                institucion: institucion !== undefined ? institucion?.trim() : usuario.institucion,
+                bio: bio !== undefined ? bio?.trim() : usuario.bio,
+                carrera_interes: carrera_interes !== undefined ? carrera_interes?.trim() : usuario.carrera_interes,
             });
 
             res.status(200).json({
                 success: true,
                 message: 'Perfil actualizado exitosamente',
-                user: {
-                    id: usuario.id_usuario.toString(),
-                    identificador_unico: usuario.identificador_unico,
-                    email: usuario.email,
-                    nombres: usuario.nombres,
-                    apellidos: usuario.apellidos,
-                    rol: usuario.rol.nombre_rol,
-                    carrera_interes: usuario.carrera_interes,
-                    institucion: usuario.institucion,
-                    bio: usuario.bio,
-                    avatar: usuario.avatar,
-                    fecha_registro: usuario.fecha_registro,
-                    primer_ingreso: usuario.primer_ingreso,
-                    activo: usuario.activo,
-                },
+                user: AuthController.toAuthUser(usuario),
             });
         } catch (error) {
             next(error);
@@ -485,7 +568,7 @@ class AuthController {
 
     /**
      * PUT /api/auth/password
-     * Cambia la contraseña del usuario (sin autenticación de contraseña actual)
+     * Cambia la contraseña del usuario y revoca todas las sesiones activas
      */
     static async updatePassword(req, res, next) {
         try {
@@ -496,19 +579,18 @@ class AuthController {
             if (!currentPassword) {
                 return res.status(400).json({
                     success: false,
-                    message: 'La contrasena actual es requerida',
+                    message: 'La contraseña actual es requerida',
                 });
             }
 
             if (!newPassword || newPassword.length < 8) {
                 return res.status(400).json({
                     success: false,
-                    message: 'La nueva contrasena debe tener al menos 8 caracteres',
+                    message: 'La nueva contraseña debe tener al menos 8 caracteres',
                 });
             }
 
             const usuario = await Usuario.findByPk(userId);
-
             if (!usuario) {
                 return res.status(404).json({
                     success: false,
@@ -516,37 +598,33 @@ class AuthController {
                 });
             }
 
-            // Actualizar contraseña
             const isValidCurrentPassword = await usuario.validarPassword(currentPassword);
             if (!isValidCurrentPassword) {
                 return res.status(401).json({
                     success: false,
-                    message: 'La contrasena actual no es correcta',
+                    message: 'La contraseña actual no es correcta',
                 });
             }
 
-            await usuario.update({
-                password_hash: newPassword,
-            });
+            await usuario.update({ password_hash: newPassword });
 
-            // Registrar en historial
             await SessionService.logSessionHistory(
                 userId,
                 {
                     device: req.headers['user-agent']?.match(/\(([^)]+)\)/)?.[1],
-                    ip: req.ip || req.connection.remoteAddress,
+                    ip: req.ip || req.connection?.remoteAddress,
                 },
                 'cambio_password',
                 true
             );
 
-            // Revocar token actual y cerrar todas las sesiones
+            // Revocar token actual y todas las sesiones
             await TokenService.revokeToken(token);
             await SessionService.deactivateAllUserSessions(
                 userId,
                 {
                     device: req.headers['user-agent']?.match(/\(([^)]+)\)/)?.[1],
-                    ip: req.ip || req.connection.remoteAddress,
+                    ip: req.ip || req.connection?.remoteAddress,
                 }
             );
 
@@ -560,6 +638,10 @@ class AuthController {
         }
     }
 
+    /**
+     * GET /api/auth/sessions
+     * Lista sesiones activas del usuario (RQ101, RQ104)
+     */
     static async getSessions(req, res, next) {
         try {
             await SessionService.updateLastAccess(req.token);
@@ -592,13 +674,17 @@ class AuthController {
         }
     }
 
+    /**
+     * POST /api/auth/logout-all
+     * Cierra todas las sesiones activas del usuario (RQ107, RIC-08)
+     */
     static async logoutAll(req, res, next) {
         try {
             const sessions = await SessionService.getUserActiveSessions(req.user.id);
             await Promise.all(sessions.map((session) => TokenService.revokeToken(session.token_sesion)));
             await SessionService.deactivateAllUserSessions(req.user.id, {
                 device: req.headers['user-agent']?.match(/\(([^)]+)\)/)?.[1],
-                ip: req.ip || req.connection.remoteAddress,
+                ip: req.ip || req.connection?.remoteAddress,
             });
 
             res.status(200).json({ success: true, message: 'Todas las sesiones fueron cerradas' });
@@ -607,13 +693,17 @@ class AuthController {
         }
     }
 
+    /**
+     * POST /api/auth/forgot-password
+     * Solicita recuperación de contraseña con respuestas neutras (RIC-07)
+     */
     static async forgotPassword(req, res, next) {
         try {
             const email = String(req.body.email || '').toLowerCase().trim();
             const usuario = email ? await Usuario.findOne({ where: { email } }) : null;
             let resetToken = null;
 
-            if (usuario) {
+            if (usuario && usuario.activo) {
                 resetToken = crypto.randomBytes(32).toString('hex');
                 await redis.setex(`password_reset:${resetToken}`, 900, usuario.id_usuario);
             }
@@ -628,16 +718,27 @@ class AuthController {
         }
     }
 
+    /**
+     * POST /api/auth/reset-password
+     * Restablece contraseña consumiendo el token de forma atómica (RIC-07, RIC-AC-03)
+     */
     static async resetPassword(req, res, next) {
         try {
             const { token, newPassword } = req.body;
-            if (!token || !newPassword || newPassword.length < 6) {
-                return res.status(400).json({ success: false, message: 'Token y nueva contraseña validos son requeridos' });
+            if (!token || !newPassword || newPassword.length < 8) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Token válido y nueva contraseña de al menos 8 caracteres son requeridos',
+                });
             }
 
-            const userId = await redis.get(`password_reset:${token}`);
+            // Consumo atómico: GET y DEL simultáneo en Redis para prevenir carreras de concurrencia
+            const userId = await atomicConsumeResetToken(token);
             if (!userId) {
-                return res.status(400).json({ success: false, message: 'Token expirado o invalido' });
+                return res.status(400).json({
+                    success: false,
+                    message: 'Token expirado, inválido o ya utilizado',
+                });
             }
 
             const usuario = await Usuario.findByPk(userId);
@@ -646,18 +747,28 @@ class AuthController {
             }
 
             await usuario.update({ password_hash: newPassword });
-            await redis.del(`password_reset:${token}`);
+
+            // Revocar tokens y cerrar sesiones activas
+            const sessions = await SessionService.getUserActiveSessions(usuario.id_usuario);
+            await Promise.all(sessions.map(s => TokenService.revokeToken(s.token_sesion)));
             await SessionService.deactivateAllUserSessions(usuario.id_usuario, {
                 device: req.headers['user-agent']?.match(/\(([^)]+)\)/)?.[1],
-                ip: req.ip || req.connection.remoteAddress,
+                ip: req.ip || req.connection?.remoteAddress,
             });
 
-            res.status(200).json({ success: true, message: 'Contraseña restablecida correctamente' });
+            res.status(200).json({
+                success: true,
+                message: 'Contraseña restablecida correctamente. Todas las sesiones han sido cerradas.',
+            });
         } catch (error) {
             next(error);
         }
     }
 
+    /**
+     * POST /api/auth/2fa/request
+     * Solicita código 2FA para usuario autenticado
+     */
     static async requestTwoFactor(req, res, next) {
         try {
             const code = String(Math.floor(100000 + Math.random() * 900000));
@@ -665,7 +776,7 @@ class AuthController {
 
             res.status(200).json({
                 success: true,
-                message: 'Codigo de verificacion generado',
+                message: 'Código de verificación generado',
                 code: config.NODE_ENV === 'production' ? undefined : code,
             });
         } catch (error) {
@@ -673,15 +784,169 @@ class AuthController {
         }
     }
 
+    /**
+     * POST /api/auth/2fa/verify
+     * Verifica código 2FA
+     */
     static async verifyTwoFactor(req, res, next) {
         try {
             const expectedCode = await redis.get(`2fa:${req.user.id}`);
             if (!expectedCode || expectedCode !== String(req.body.code || '').trim()) {
-                return res.status(400).json({ success: false, message: 'Codigo invalido o expirado' });
+                return res.status(400).json({ success: false, message: 'Código inválido o expirado' });
             }
 
             await redis.del(`2fa:${req.user.id}`);
-            res.status(200).json({ success: true, message: 'Verificacion completada' });
+            res.status(200).json({ success: true, message: 'Verificación completada' });
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    /**
+     * POST /api/auth/teacher/request
+     * Solicita habilitación docente con evidencia institucional (RIC-02)
+     */
+    static async requestTeacherRole(req, res, next) {
+        try {
+            const { institucion, evidencia } = req.body;
+            if (!institucion || String(institucion).trim().length < 3) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Institución académica es requerida (mínimo 3 caracteres)',
+                });
+            }
+
+            const solicitud = await SolicitudDocente.create({
+                usuario_id: req.user.id,
+                institucion: String(institucion).trim(),
+                evidencia: evidencia ? String(evidencia).trim() : null,
+                estado: 'pendiente',
+            });
+
+            res.status(201).json({
+                success: true,
+                message: 'Solicitud de habilitación docente registrada para revisión administrativa',
+                solicitud,
+            });
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    /**
+     * GET /api/auth/teacher/requests
+     * Lista solicitudes de rol docente (Solo administrador)
+     */
+    static async listTeacherRequests(req, res, next) {
+        try {
+            if (req.user.rol !== 'admin') {
+                return res.status(403).json({ success: false, message: 'Solo administradores pueden listar solicitudes' });
+            }
+
+            const solicitudes = await SolicitudDocente.findAll({
+                include: [{
+                    model: Usuario,
+                    as: 'usuario',
+                    attributes: ['id_usuario', 'identificador_unico', 'nombres', 'apellidos', 'email'],
+                }],
+                order: [['fecha_solicitud', 'DESC']],
+            });
+
+            res.status(200).json({ success: true, solicitudes });
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    /**
+     * POST /api/auth/teacher/requests/:id/approve
+     * Aprueba solicitud de rol docente (Solo administrador, M1-S03)
+     */
+    static async approveTeacherRequest(req, res, next) {
+        try {
+            if (req.user.rol !== 'admin') {
+                return res.status(403).json({ success: false, message: 'Solo administradores pueden aprobar solicitudes' });
+            }
+
+            const solicitud = await SolicitudDocente.findByPk(req.params.id);
+            if (!solicitud) {
+                return res.status(404).json({ success: false, message: 'Solicitud no encontrada' });
+            }
+
+            const rolDocente = await Rol.findOne({ where: { nombre_rol: 'docente' } });
+            await Usuario.update({ rol_id: rolDocente.id_rol }, { where: { id_usuario: solicitud.usuario_id } });
+
+            await solicitud.update({
+                estado: 'aprobada',
+                revisado_por: req.user.id,
+                fecha_revision: new Date(),
+            });
+
+            res.status(200).json({ success: true, message: 'Habilitación docente aprobada exitosamente' });
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    /**
+     * POST /api/auth/teacher/requests/:id/reject
+     * Rechaza solicitud de rol docente (Solo administrador)
+     */
+    static async rejectTeacherRequest(req, res, next) {
+        try {
+            if (req.user.rol !== 'admin') {
+                return res.status(403).json({ success: false, message: 'Solo administradores pueden rechazar solicitudes' });
+            }
+
+            const solicitud = await SolicitudDocente.findByPk(req.params.id);
+            if (!solicitud) {
+                return res.status(404).json({ success: false, message: 'Solicitud no encontrada' });
+            }
+
+            await solicitud.update({
+                estado: 'rechazada',
+                revisado_por: req.user.id,
+                motivo_rechazo: req.body.motivo || 'No cumple requisitos institucionales',
+                fecha_revision: new Date(),
+            });
+
+            res.status(200).json({ success: true, message: 'Solicitud rechazada' });
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    /**
+     * POST /api/auth/admin/assign-role
+     * Asignación manual de rol por administrador (M1-S03-01: 'El sistema permite asignar manualmente el rol Docente')
+     */
+    static async assignRole(req, res, next) {
+        try {
+            if (req.user.rol !== 'admin') {
+                return res.status(403).json({ success: false, message: 'Solo administradores pueden asignar roles' });
+            }
+
+            const { targetUserId, roleName } = req.body;
+            if (!targetUserId || !roleName) {
+                return res.status(400).json({ success: false, message: 'targetUserId y roleName son requeridos' });
+            }
+
+            const rol = await Rol.findOne({ where: { nombre_rol: roleName } });
+            if (!rol) {
+                return res.status(400).json({ success: false, message: 'Rol inválido' });
+            }
+
+            const user = await Usuario.findByPk(targetUserId);
+            if (!user) {
+                return res.status(404).json({ success: false, message: 'Usuario no encontrado' });
+            }
+
+            await user.update({ rol_id: rol.id_rol });
+
+            res.status(200).json({
+                success: true,
+                message: `Rol '${roleName}' asignado exitosamente al usuario`,
+            });
         } catch (error) {
             next(error);
         }
