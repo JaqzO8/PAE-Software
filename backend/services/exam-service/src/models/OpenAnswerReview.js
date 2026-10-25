@@ -49,6 +49,11 @@ const OpenAnswerReview = sequelize.define('revision_respuestas_abiertas', {
         allowNull: false,
         defaultValue: 'pendiente',
     },
+    version: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        defaultValue: 1,
+    },
     fecha_revision: {
         type: DataTypes.DATE,
         allowNull: true,
