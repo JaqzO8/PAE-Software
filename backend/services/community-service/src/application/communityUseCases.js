@@ -1,5 +1,4 @@
 const { fail, positiveId, requireActive, requireOwner, requireNotExpelled, invitationExpiresAt } = require('../domain/communityPolicy');
-const { createHash } = require('node:crypto');
 
 // Ports: unitOfWork(callback) supplies a transactional repository; clock.now() returns a Date.
 function createCommunityUseCases({ unitOfWork, clock, invitationTtlMs, findStudent }) {
