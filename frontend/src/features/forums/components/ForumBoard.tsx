@@ -4,7 +4,23 @@ import { useAuth } from '../../../context/AuthContext';
 import { invitationError } from '../../community/services/invitationsService';
 import * as forums from '../services/forumsService';
 
-export function ForumBoard({ mine = false, groupId }: { mine?: boolean; groupId?: string }) {
+interface ForumBoardProps {
+  readonly mine?: boolean;
+  readonly groupId?: string;
+}
+
+function getForumBoardTitle(groupId?: string | null, mine?: boolean): string {
+  if (groupId) return 'Conversaciones del foro del grupo';
+  if (mine) return 'Mis publicaciones';
+  return 'Foros públicos';
+}
+
+function getDetailStateText(removed?: boolean, isResolved?: boolean): string {
+  if (removed) return 'Retirada';
+  return isResolved ? 'Resuelta' : 'Abierta';
+}
+
+export function ForumBoard({ mine = false, groupId }: ForumBoardProps) {
   const { user } = useAuth();
   const [items, setItems] = useState<forums.ForumPost[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
@@ -71,10 +87,10 @@ export function ForumBoard({ mine = false, groupId }: { mine?: boolean; groupId?
     });
   };
   return <section className="space-y-5" aria-label={groupId ? 'Foros del grupo' : 'Foros públicos'}>
-    <div className="flex flex-wrap gap-3 items-center justify-between"><h1 className="text-2xl font-bold">{groupId ? 'Conversaciones del foro del grupo' : mine ? 'Mis publicaciones' : 'Foros públicos'}</h1>
+    <div className="flex flex-wrap gap-3 items-center justify-between"><h1 className="text-2xl font-bold">{getForumBoardTitle(groupId, mine)}</h1>
       <Button disabled={busy} onClick={() => { setCreating(!creating); setTitle(''); setBody(''); }}>Nueva publicación</Button></div>
     <p>{groupId ? 'Solo los miembros vigentes pueden leer y participar aquí.' : 'Comparte conocimientos con la comunidad. No publiques información personal ni respuestas de evaluaciones activas.'}</p>
-    {error && <p role="alert">{error}</p>}{notice && <p role="status">{notice}</p>}
+    {error && <p role="alert">{error}</p>}{notice && <output className="block">{notice}</output>}
     {['docente', 'admin'].includes(user?.rol || '') && <label className="flex gap-2"><input type="checkbox" checked={moderation} onChange={event => { setModeration(event.target.checked); setDetail(null); }} />Ver reportes pendientes y publicaciones retiradas que puedo moderar</label>}
     <form onSubmit={event => { event.preventDefault(); setSearch(query); }} className="flex items-end gap-2"><div className="flex-1"><label htmlFor="forum-search">Buscar por título o contenido</label><Input id="forum-search" value={query} maxLength={100} onChange={event => setQuery(event.target.value)} /></div><Button disabled={busy}>Buscar</Button><Button type="button" variant="outline" disabled={busy} onClick={() => void run(() => load())}>Actualizar</Button></form>
     {creating && <form onSubmit={create} className="border rounded-xl p-4 space-y-3">
@@ -83,7 +99,7 @@ export function ForumBoard({ mine = false, groupId }: { mine?: boolean; groupId?
       <label htmlFor="forum-tags">Etiquetas separadas por comas (hasta cinco)</label><Input id="forum-tags" value={tags} onChange={event => setTags(event.target.value)} maxLength={154} />
       <Button disabled={busy}>Publicar</Button>{' '}<Button type="button" variant="outline" onClick={() => setCreating(false)}>Cancelar</Button>
     </form>}
-    {loading ? <p role="status">Cargando publicaciones…</p> : !items.length && <p>No hay publicaciones para esta búsqueda.</p>}
+    {loading ? <output className="block">Cargando publicaciones…</output> : !items.length && <p>No hay publicaciones para esta búsqueda.</p>}
     <ul className="space-y-3">{items.map(item => <li key={item.id} className="border rounded-xl p-4 space-y-2">
       <button className="text-lg font-semibold underline text-left" onClick={() => void run(async () => { setEditMode(false); setReason(''); await open(item.id); })}>{item.title}</button>
       <p className="whitespace-pre-wrap break-words">{item.question.slice(0, 240)}</p><p className="text-sm">{item.author} · {item.createdAt} · {item.comments} respuestas · {item.isResolved ? 'Resuelto' : 'Abierto'}</p>
@@ -93,7 +109,7 @@ export function ForumBoard({ mine = false, groupId }: { mine?: boolean; groupId?
     {detail && <article className="border-2 rounded-xl p-5 space-y-4" aria-label="Detalle de la publicación">
       <div className="flex justify-between gap-2"><h2 className="text-xl font-bold">{detail.title}</h2><Button variant="outline" onClick={() => { setDetail(null); setEditMode(false); }}>Cerrar detalle</Button></div>
       <p className="whitespace-pre-wrap break-words">{detail.question}</p>
-      <p>{detail.author} · {detail.createdAt} · {detail.removed ? 'Retirada' : detail.isResolved ? 'Resuelta' : 'Abierta'}</p>
+      <p>{detail.author} · {detail.createdAt} · {getDetailStateText(detail.removed, detail.isResolved)}</p>
       <label htmlFor="forum-reason">Motivo del reporte o de la acción de moderación</label><Input id="forum-reason" value={reason} onChange={event => setReason(event.target.value)} maxLength={1000} />
       <div className="flex flex-wrap gap-2"><Button variant="outline" disabled={busy || reason.trim().length < 3} onClick={() => void run(async () => { await forums.reportForum(detail.id, reason); setReason(''); setNotice('Reporte enviado para revisión.'); })}>Reportar contenido</Button>
         {(detail.canEdit || detail.canModerate) && <>

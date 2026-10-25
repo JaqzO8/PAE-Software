@@ -5,7 +5,6 @@ function createApp() {
     const cors = require('cors');
     const helmet = require('helmet');
     const rateLimit = require('express-rate-limit');
-    const path = require('path');
     const config = require('./config/env');
     const { errorHandler, notFound } = require('./middlewares/errorMiddleware');
 

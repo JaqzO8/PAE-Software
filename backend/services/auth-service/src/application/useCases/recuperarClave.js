@@ -31,7 +31,7 @@ async function solicitarRecuperacion({
     return {
         success: true,
         message: 'Si el correo existe, se enviaron instrucciones para recuperar la cuenta',
-        resetToken: (cryptoProvider && cryptoProvider.isTestEnv && resetToken) ? resetToken : undefined,
+        resetToken: (cryptoProvider?.isTestEnv && resetToken) ? resetToken : undefined,
     };
 }
 

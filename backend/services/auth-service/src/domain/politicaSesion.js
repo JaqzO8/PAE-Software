@@ -54,7 +54,7 @@ function validarPoliticaPassword(password) {
         return { valida: false, motivo: `La contraseña debe tener al menos ${RECUPERACION_CONFIG.LONGITUD_MINIMA_PASSWORD} caracteres` };
     }
     const tieneLetra = /[a-zA-Z]/.test(password);
-    const tieneNumero = /[0-9]/.test(password);
+    const tieneNumero = /\d/.test(password);
     if (!tieneLetra || !tieneNumero) {
         return { valida: false, motivo: 'La contraseña debe contener al menos una letra y un número' };
     }

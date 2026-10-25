@@ -22,7 +22,15 @@ function createFriendshipUseCases({ withPair, findReference, findUser, clock }) 
                 if (action === 'cancel' && recipient) fail('SENDER_REQUIRED', 'Solo el remitente cancela la solicitud', 403);
                 const state = { accept: 'aceptada', reject: 'rechazada', cancel: 'cancelada', remove: 'eliminada', block: 'bloqueada' }[action];
                 if (item.estado === state) return item;
-                if (action === 'remove' ? item.estado !== 'aceptada' : action === 'block' ? !['aceptada', 'pendiente'].includes(item.estado) : item.estado !== 'pendiente') fail('FRIENDSHIP_CLOSED', 'La relación cambió; actualiza la lista', 409);
+                let invalidState = item.estado !== 'pendiente';
+                if (action === 'remove') {
+                    invalidState = item.estado !== 'aceptada';
+                } else if (action === 'block') {
+                    invalidState = !['aceptada', 'pendiente'].includes(item.estado);
+                }
+                if (invalidState) {
+                    fail('FRIENDSHIP_CLOSED', 'La relación cambió; actualiza la lista', 409);
+                }
                 return repo.save(item, { estado: state, fecha_respuesta: clock.now() });
             });
         },

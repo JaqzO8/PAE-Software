@@ -6,7 +6,15 @@ import { invitationError } from '../../community/services/invitationsService';
 import { communityService } from '../../community/services/communityService';
 import type { GroupParticipant } from '../services/groupsService';
 
-export function CommunityOwnerTools({ communityId, ownerId, participants, onChanged, onClosed }: { communityId: string; ownerId: string; participants: GroupParticipant[]; onChanged: () => Promise<void>; onClosed: () => void }) {
+interface CommunityOwnerToolsProps {
+  readonly communityId: string;
+  readonly ownerId: string;
+  readonly participants: readonly GroupParticipant[];
+  readonly onChanged: () => Promise<void>;
+  readonly onClosed: () => void;
+}
+
+export function CommunityOwnerTools({ communityId, ownerId, participants, onChanged, onClosed }: CommunityOwnerToolsProps) {
   const [items, setItems] = useState<InvitationRecord[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [error, setError] = useState('');
@@ -34,7 +42,7 @@ export function CommunityOwnerTools({ communityId, ownerId, participants, onChan
     <InviteStudent communityId={communityId} onSent={() => void load()} />
     <details className="border rounded-xl p-4 space-y-4">
       <summary className="cursor-pointer font-semibold">Administrar participantes e invitaciones</summary>
-      {error && <p role="alert">{error}</p>}{notice && <p role="status">{notice}</p>}
+      {error && <p role="alert">{error}</p>}{notice && <output className="block">{notice}</output>}
       <h2 className="font-semibold">Historial de invitaciones</h2>
       <Button variant="outline" disabled={busy} onClick={() => void load()}>Actualizar historial</Button>
       <ul>{items.map(item => <li key={item.id_invitacion} className="flex flex-wrap justify-between gap-2 py-2 border-b">

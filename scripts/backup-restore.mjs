@@ -3,8 +3,6 @@
  * Script de respaldo, generación de manifiesto SHA-256 y verificación de restauración (RIC-15 / RQ33 / M8-HU24).
  */
 
-import fs from 'node:fs';
-import path from 'node:path';
 import crypto from 'node:crypto';
 
 /**

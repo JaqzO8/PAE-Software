@@ -15,12 +15,10 @@ const initializeRoles = async () => {
             { nombre_rol: 'admin', descripcion: 'Administrador con acceso completo al sistema' },
         ];
 
-        for (const rolData of roles) {
-            await Rol.findOrCreate({
-                where: { nombre_rol: rolData.nombre_rol },
-                defaults: rolData,
-            });
-        }
+        await Promise.all(roles.map((rolData) => Rol.findOrCreate({
+            where: { nombre_rol: rolData.nombre_rol },
+            defaults: rolData,
+        })));
         console.log('✅ Roles inicializados correctamente');
     } catch (error) {
         console.error('❌ Error inicializando roles:', error.message);

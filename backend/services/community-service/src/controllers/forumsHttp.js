@@ -35,6 +35,12 @@ router.get('/', handle(async (req, res) => {
     const moderation = req.query.moderation === 'true';
     if (moderation && !['admin', 'docente'].includes(req.user.rol)) fail('MODERATOR_REQUIRED', 'No tienes permisos de moderación', 403);
     const before = req.query.before ? positiveId(req.query.before) : 2147483647;
+    let communityFilter = 'f.community_id IS NULL';
+    if (groupId) {
+        communityFilter = 'f.community_id=:groupId';
+    } else if (mine || moderation) {
+        communityFilter = 'true';
+    }
     const rows = await query(`SELECT f.*,c.nombre AS group_name,
       (SELECT COUNT(*) FROM forum_likes l WHERE l.thread_id=f.id) AS likes,
       (SELECT COUNT(*) FROM forum_comments r WHERE r.thread_id=f.id AND r.removed_at IS NULL) AS comments,
@@ -42,7 +48,7 @@ router.get('/', handle(async (req, res) => {
       FROM forum_threads f LEFT JOIN comunidades c ON c.id_comunidad=f.community_id
       WHERE f.id < :before AND (f.removed_at IS NULL OR (:mine AND f.author_id=:userId) OR :moderation)
         AND (NOT :mine OR f.author_id=:userId)
-        AND (${groupId ? 'f.community_id=:groupId' : mine || moderation ? 'true' : 'f.community_id IS NULL'})
+        AND (${communityFilter})
         AND (NOT :moderation OR ((:isAdmin OR c.profesor_id=:userId) AND (f.removed_at IS NOT NULL OR EXISTS(SELECT 1 FROM forum_reports r WHERE r.thread_id=f.id AND r.status='pending'))))
         AND (f.community_id IS NULL OR :moderation OR (c.activa AND (c.profesor_id=:userId OR :isAdmin OR EXISTS(SELECT 1 FROM miembros_comunidad m WHERE m.comunidad_id=f.community_id AND m.usuario_id=:userId AND m.activo AND m.fecha_expulsion IS NULL))))
         AND (f.title ILIKE :search OR f.body ILIKE :search)

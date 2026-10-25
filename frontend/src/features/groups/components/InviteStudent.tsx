@@ -2,7 +2,12 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Button, Input } from "../../../desingSystem/primitives";
 import { invitationsService, invitationError, type PublicStudent } from "../../community/services/invitationsService";
 
-export function InviteStudent({ communityId, onSent }: { communityId: string; onSent?: () => void }) {
+interface InviteStudentProps {
+  readonly communityId: string;
+  readonly onSent?: () => void;
+}
+
+export function InviteStudent({ communityId, onSent }: InviteStudentProps) {
   const [query, setQuery] = useState("");
   const [students, setStudents] = useState<PublicStudent[]>([]);
   const [busy, setBusy] = useState(false);
@@ -41,7 +46,7 @@ export function InviteStudent({ communityId, onSent }: { communityId: string; on
         <Button type="submit" disabled={busy || query.trim().length < 2}>{busy ? "Procesando…" : "Buscar estudiantes"}</Button>
       </form>
       {error && <p role="alert">{error}</p>}
-      {notice && <p role="status">{notice}</p>}
+      {notice && <output className="block">{notice}</output>}
       {searched && !busy && !notice && !error && students.length === 0 && <p>No se encontraron estudiantes.</p>}
       <ul className="space-y-2">{students.map(student => (
         <li key={student.id} className="flex items-center justify-between gap-3">

@@ -2,7 +2,7 @@ const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-
 const id = (value) => typeof value === 'string' && /^[1-9]\d{0,18}$/.test(value);
 
 function validateConfirmedResult(event) {
-    if (!event || event.type !== 'ResultadoConfirmado.v1' || event.schemaVersion !== 1 || event.producer !== 'evaluation') throw new Error('Unsupported result event');
+    if (event?.type !== 'ResultadoConfirmado.v1' || event?.schemaVersion !== 1 || event?.producer !== 'evaluation') throw new Error('Unsupported result event');
     if (!uuid.test(event.eventId) || !uuid.test(event.correlationId)) throw new Error('Invalid event identity');
     if (typeof event.occurredAt !== 'string' || !/^\d{4}-\d{2}-\d{2}T.*Z$/.test(event.occurredAt) || !Number.isFinite(Date.parse(event.occurredAt))) throw new Error('Invalid event time');
     const data = event.data;

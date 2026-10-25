@@ -5,7 +5,13 @@ import { collaborationService as service, type ChatMessage } from '../../communi
 import { invitationError } from '../../community/services/invitationsService';
 import { connectCommunity } from '../../community/services/communityRealtime';
 
-export function CommunityChat({ communityId, userId, isOwner }: { communityId: string; userId: string; isOwner: boolean }) {
+interface CommunityChatProps {
+  readonly communityId: string;
+  readonly userId: string;
+  readonly isOwner: boolean;
+}
+
+export function CommunityChat({ communityId, userId, isOwner }: CommunityChatProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [text, setText] = useState('');
@@ -78,12 +84,12 @@ export function CommunityChat({ communityId, userId, isOwner }: { communityId: s
     } catch (cause) { failure(cause); } finally { setBusy(false); }
   };
   return <section aria-label="Conversación del grupo" className="space-y-4 p-4">
-    <p role="status" className="text-sm">{online ? 'Conversación conectada en tiempo real' : 'Reconectando. Puedes actualizar la conversación y reintentar el envío.'}</p>
+    <output className="block text-sm">{online ? 'Conversación conectada en tiempo real' : 'Reconectando. Puedes actualizar la conversación y reintentar el envío.'}</output>
     <div className="flex gap-2"><Button variant="outline" onClick={() => void refresh()} disabled={busy}>Actualizar conversación</Button>
       {cursor && <Button variant="outline" onClick={() => void older()} disabled={busy}>Mensajes anteriores</Button>}</div>
     {error && <p role="alert">{error}</p>}
-    {notice && <p role="status">{notice}</p>}
-    {!loaded && !error && <p role="status">Cargando conversación…</p>}
+    {notice && <output className="block">{notice}</output>}
+    {!loaded && !error && <output className="block">Cargando conversación…</output>}
     {loaded && messages.length === 0 && <p>Escribe el primer mensaje del grupo.</p>}
     <ol className="max-h-[32rem] overflow-auto space-y-3" aria-label="Mensajes">
       {messages.map(message => <li key={message.id} className="rounded-xl border p-3 space-y-2">

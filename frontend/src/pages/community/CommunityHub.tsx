@@ -135,7 +135,7 @@ export default function CommunityHubPage() {
   }, [hub]);
 
   useEffect(() => {
-    loadHub();
+    void loadHub();
   }, []);
 
   const loadHub = async () => {

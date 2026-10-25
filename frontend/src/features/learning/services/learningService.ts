@@ -803,24 +803,24 @@ export const submitSimulacro = async (submission: SimulacroSubmission): Promise<
   }
 };
 
+const syncSingleAttempt = async (item: { id: string; submission: any }) => {
+  try {
+    await submitSimulacroApi(item.submission);
+    await removeOfflineAttempt(item.id);
+    return item.id;
+  } catch (error: any) {
+    await markOfflineAttemptTried(item.id);
+    if (!isOfflineSubmissionError(error) && error?.response?.status === 409) {
+      await removeOfflineAttempt(item.id);
+    }
+    return null;
+  }
+};
+
 export const syncOfflineAttempts = async () => {
   const queued = await getOfflineAttempts();
-  const synced: string[] = [];
-
-  for (const item of queued) {
-    try {
-      await submitSimulacroApi(item.submission);
-      await removeOfflineAttempt(item.id);
-      synced.push(item.id);
-    } catch (error: any) {
-      await markOfflineAttemptTried(item.id);
-      if (!isOfflineSubmissionError(error) && error?.response?.status === 409) {
-        await removeOfflineAttempt(item.id);
-      }
-    }
-  }
-
-  return synced;
+  const results = await Promise.all(queued.map((item) => syncSingleAttempt(item)));
+  return results.filter((id): id is string => Boolean(id));
 };
 
 export const getAchievements = async (): Promise<LearningAchievement[]> => {

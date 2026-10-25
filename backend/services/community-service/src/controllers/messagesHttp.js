@@ -25,8 +25,18 @@ class MessageController {
             await Promise.all([...new Set(page.map(row => row.usuario_id))].map(async id => {
                 try { users.set(Number(id), await findUser(id, req.token)); } catch { /* History remains usable when a profile is unavailable. */ }
             }));
-            res.json({ success: true, messages: page.map(row => dto(row, users.get(Number(row.usuario_id)))), total: page.length,
-                hasMore: rows.length > limit, nextCursor: rows.length > limit ? String(req.query.after ? page.at(-1).id_mensaje : page[0].id_mensaje) : null });
+            let nextCursor = null;
+            if (rows.length > limit) {
+                const targetRow = req.query.after ? page.at(-1) : page[0];
+                nextCursor = String(targetRow.id_mensaje);
+            }
+            res.json({
+                success: true,
+                messages: page.map(row => dto(row, users.get(Number(row.usuario_id)))),
+                total: page.length,
+                hasMore: rows.length > limit,
+                nextCursor,
+            });
         } catch (error) { next(error); }
     }
     static async sendMessage(req, res, next) {
