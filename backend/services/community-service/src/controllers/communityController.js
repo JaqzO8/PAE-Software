@@ -427,6 +427,7 @@ class CommunityController {
     static async leave(req, res, next) {
         try {
             await useCases.leave({ communityId: req.params.id, actor: req.user });
+            req.app.get('communityRealtime')?.revokeMember(req.params.id, req.user.id);
             res.status(200).json({ success: true, message: 'Has salido de la comunidad' });
         } catch (error) { next(error); }
     }
@@ -438,6 +439,7 @@ class CommunityController {
     static async delete(req, res, next) {
         try {
             await useCases.close({ communityId: req.params.id, actor: req.user });
+            req.app.get('communityRealtime')?.closeGroup(req.params.id);
             res.status(200).json({ success: true, message: 'Comunidad eliminada exitosamente' });
         } catch (error) { next(error); }
     }
@@ -449,6 +451,7 @@ class CommunityController {
     static async kickMember(req, res, next) {
         try {
             await useCases.kick({ communityId: req.params.id, actor: req.user, userId: req.params.userId, reason: req.body.motivo });
+            req.app.get('communityRealtime')?.revokeMember(req.params.id, req.params.userId);
             res.status(200).json({ success: true, message: 'Miembro expulsado exitosamente' });
         } catch (error) { next(error); }
     }

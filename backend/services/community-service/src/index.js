@@ -12,11 +12,17 @@ const startServer = async () => {
         const dbConnected = await testConnection();
         if (!dbConnected) throw new Error('DB connection failed');
 
+        const { sequelize } = require('./config/database');
+        if (!await sequelize.getQueryInterface().tableExists('comunidades')) await syncDatabase();
+        await require('../scripts/migrate').migrate(sequelize);
         await syncDatabase();
         await repairCommunityDatabase();
         await seedCommunityDefaults();
 
-        return app.listen(config.PORT, () => {
+        const server = require('node:http').createServer(app);
+        const realtime = await require('./realtime/communitySocket').attachCommunityRealtime(server);
+        app.set('communityRealtime', realtime);
+        return server.listen(config.PORT, () => {
             console.log('✅ ========================================');
             console.log(`✅ Community Service en puerto ${config.PORT}`);
             console.log(`✅ Ambiente: ${config.NODE_ENV}`);

@@ -1,4 +1,5 @@
 const { fail, positiveId, requireActive, requireOwner, requireNotExpelled, invitationExpiresAt } = require('../domain/communityPolicy');
+const { createHash } = require('node:crypto');
 
 // Ports: unitOfWork(callback) supplies a transactional repository; clock.now() returns a Date.
 function createCommunityUseCases({ unitOfWork, clock, invitationTtlMs, findStudent }) {
@@ -41,12 +42,41 @@ function createCommunityUseCases({ unitOfWork, clock, invitationTtlMs, findStude
         return outcome;
     };
     return {
-        publishMessage: ({ communityId, actor, content }) => inCommunity(communityId, async (repo, community) => {
+        publishMessage: ({ communityId, actor, content, clientId }) => inCommunity(communityId, async (repo, community) => {
             if (typeof content !== 'string' || !content.trim() || content.trim().length > 1000) fail('INVALID_MESSAGE', 'El mensaje debe tener entre 1 y 1000 caracteres');
             const member = await repo.findMember(community.id_comunidad, positiveId(actor.id));
             requireNotExpelled(member);
             if (!member?.activo) fail('MEMBERSHIP_REQUIRED', 'No eres miembro de esta comunidad', 403);
-            return repo.createMessage({ comunidad_id: community.id_comunidad, usuario_id: positiveId(actor.id), contenido: content.trim(), fecha_envio: clock.now() });
+            if (clientId != null && (typeof clientId !== 'string' || !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(clientId))) fail('INVALID_REQUEST_ID', 'Identificador de mensaje inválido');
+            const hash = createHash('sha256').update(content.trim()).digest('hex');
+            if (clientId) {
+                const previous = await repo.findMessageRequest(community.id_comunidad, positiveId(actor.id), clientId);
+                if (previous) {
+                    if (previous.request_hash !== hash) fail('REQUEST_CONFLICT', 'El identificador ya corresponde a otro mensaje', 409);
+                    return { ...previous, replayed: true };
+                }
+            }
+            return repo.createMessage({ comunidad_id: community.id_comunidad, usuario_id: positiveId(actor.id), contenido: content.trim(), fecha_envio: clock.now(), client_id: clientId || null, request_hash: hash });
+        }),
+        changeMessage: ({ communityId, messageId, actor, content, remove, version, reason }) => inCommunity(communityId, async (repo, community) => {
+            const member = await repo.findMember(community.id_comunidad, positiveId(actor.id));
+            requireNotExpelled(member);
+            if (!member?.activo) fail('MEMBERSHIP_REQUIRED', 'No eres miembro de esta comunidad', 403);
+            const message = await repo.findMessage(community.id_comunidad, positiveId(messageId));
+            if (!message) fail('MESSAGE_NOT_FOUND', 'Mensaje no encontrado', 404);
+            const author = Number(message.usuario_id) === positiveId(actor.id);
+            if (!author && !(remove && Number(community.profesor_id) === positiveId(actor.id))) fail('MESSAGE_FORBIDDEN', 'No puedes modificar este mensaje', 403);
+            if (message.fecha_eliminacion) {
+                if (remove) return message;
+                fail('MESSAGE_REMOVED', 'El mensaje fue retirado', 409);
+            }
+            if (!Number.isInteger(version) || version !== message.version) fail('MESSAGE_VERSION_CONFLICT', 'El mensaje cambió. Actualiza la conversación', 409);
+            if (remove) {
+                if (!author && (typeof reason !== 'string' || !reason.trim() || reason.length > 1000)) fail('REASON_REQUIRED', 'Indica el motivo de moderación');
+                return repo.saveMessage(message, { contenido: '[Mensaje retirado]', fecha_eliminacion: clock.now(), eliminado_por: positiveId(actor.id), motivo_eliminacion: author ? 'Retirado por el autor' : reason.trim(), version: message.version + 1 });
+            }
+            if (typeof content !== 'string' || !content.trim() || content.trim().length > 1000) fail('INVALID_MESSAGE', 'El mensaje debe tener entre 1 y 1000 caracteres');
+            return repo.saveMessage(message, { contenido: content.trim(), editado: true, fecha_edicion: clock.now(), version: message.version + 1 });
         }),
         async create({ actor, input }) {
             if (actor.rol !== 'docente') fail('TEACHER_REQUIRED', 'Solo los docentes pueden crear comunidades', 403);
@@ -79,13 +109,22 @@ function createCommunityUseCases({ unitOfWork, clock, invitationTtlMs, findStude
             if (previous?.estado === 'pendiente' && invitationExpiresAt(previous, invitationTtlMs) > clock.now()) {
                 fail('INVITATION_PENDING', 'Ya existe una invitación pendiente', 409);
             }
-            return repo.saveInvitation(previous, {
+            if (previous?.estado === 'pendiente') await repo.saveInvitation(previous, { estado: 'expirada', fecha_respuesta: clock.now() });
+            return repo.saveInvitation(null, {
                 comunidad_id: community.id_comunidad, profesor_id: positiveId(actor.id), estudiante_id: userId,
                 estado: 'pendiente', fecha_invitacion: clock.now(), fecha_respuesta: null,
             });
         }),
         accept: (input) => respond({ ...input, accept: true }),
         reject: (input) => respond({ ...input, accept: false }),
+        revokeInvitation: ({ communityId, invitationId, actor }) => inCommunity(communityId, async (repo, community) => {
+            requireOwner(community, actor);
+            const invitation = await repo.findInvitation(positiveId(invitationId));
+            if (!invitation || Number(invitation.comunidad_id) !== Number(community.id_comunidad)) fail('INVITATION_NOT_FOUND', 'Invitación no encontrada', 404);
+            if (invitation.estado === 'revocada') return invitation;
+            if (invitation.estado !== 'pendiente') fail('INVITATION_CLOSED', 'La invitación ya no está pendiente', 409);
+            return repo.saveInvitation(invitation, { estado: 'revocada', fecha_respuesta: clock.now() });
+        }),
         join: ({ communityId, actor }) => inCommunity(communityId, async (repo, community) => {
             if (!community.es_publica) fail('INVITATION_REQUIRED', 'Esta comunidad requiere invitación', 403);
             const member = await repo.findMember(community.id_comunidad, positiveId(actor.id));

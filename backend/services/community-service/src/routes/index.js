@@ -7,7 +7,7 @@ const resourceRoutes = require('./resourceRoutes');
 
 const ChallengeController = require('../controllers/challengeController');
 const InvitationController = require('../controllers/invitationController');
-const FriendshipController = require('../controllers/friendshipController');
+const FriendshipController = require('../controllers/friendshipsHttp');
 const CommunityHubController = require('../controllers/communityHubController');
 
 const { verifyToken } = require('../middlewares/authMiddleware');
@@ -55,6 +55,8 @@ router.put('/:id/challenges/:challengeId', verifyToken, verifyTeacherOfCommunity
 |--------------------------------------------------------------------------
 */
 router.post('/:id/invite', verifyToken, verifyRole('docente'), InvitationController.send);
+router.get('/:id/invitations/history', verifyToken, verifyTeacherOfCommunity, InvitationController.history);
+router.post('/:id/invitations/:invitationId/revoke', verifyToken, InvitationController.revoke);
 router.get('/invitations', verifyToken, InvitationController.getMyInvitations);
 router.post('/invitations/:id/accept', verifyToken, InvitationController.accept);
 router.post('/invitations/:id/reject', verifyToken, InvitationController.reject);
@@ -65,8 +67,10 @@ router.post('/invitations/:id/reject', verifyToken, InvitationController.reject)
 |--------------------------------------------------------------------------
 */
 router.post('/friends/request', verifyToken, FriendshipController.sendRequest);
+router.post('/friends/:friendshipId/:action', verifyToken, FriendshipController.respond);
 router.get('/friends', verifyToken, FriendshipController.list);
 router.get('/users/search', verifyToken, FriendshipController.searchUsers);
+router.use('/forums', require('../controllers/forumsHttp'));
 
 router.use('/', communityRoutes);
 router.use('/', messageRoutes);

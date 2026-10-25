@@ -30,7 +30,7 @@ const InvitacionComunidad = sequelize.define('invitaciones_comunidad', {
         allowNull: false,
         defaultValue: 'pendiente',
         validate: {
-            isIn: [['pendiente', 'aceptada', 'rechazada', 'expirada']],
+            isIn: [['pendiente', 'aceptada', 'rechazada', 'expirada', 'revocada']],
         },
     },
     fecha_invitacion: {
@@ -49,7 +49,7 @@ const InvitacionComunidad = sequelize.define('invitaciones_comunidad', {
         { fields: ['comunidad_id'] },
         { fields: ['estudiante_id'] },
         { fields: ['estado'] },
-        { unique: true, fields: ['comunidad_id', 'estudiante_id'] },
+        { name: 'invitation_pending_recipient', unique: true, fields: ['comunidad_id', 'estudiante_id'], where: { estado: 'pendiente' } },
     ],
 });
 

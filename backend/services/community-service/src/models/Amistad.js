@@ -20,7 +20,7 @@ const Amistad = sequelize.define('amistades', {
         allowNull: false,
         defaultValue: 'pendiente',
         validate: {
-            isIn: [['pendiente', 'aceptada', 'rechazada', 'bloqueada']],
+            isIn: [['pendiente', 'aceptada', 'rechazada', 'bloqueada', 'cancelada', 'eliminada']],
         },
     },
     fecha_solicitud: {
