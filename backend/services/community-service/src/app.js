@@ -41,7 +41,9 @@ function createApp() {
     // Logging en desarrollo
     if (config.NODE_ENV === 'development') {
         app.use((req, res, next) => {
-            console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
+            const cleanMethod = String(req.method || '').replace(/[\r\n]/g, '');
+            const cleanPath = String(req.path || '').replace(/[\r\n]/g, '');
+            console.log(`${new Date().toISOString()} - ${cleanMethod} ${cleanPath}`);
             next();
         });
     }

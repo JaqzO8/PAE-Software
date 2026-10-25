@@ -210,7 +210,7 @@ class AuthController {
             const needsMfa = Boolean(mfaRequired) || Boolean(req.headers['x-require-mfa']);
             if (needsMfa) {
                 const challengeId = crypto.randomUUID();
-                const otpCode = String(Math.floor(100000 + Math.random() * 900000));
+                const otpCode = String(crypto.randomInt(100000, 1000000));
 
                 await storeMfaChallenge(challengeId, {
                     userId: usuario.id_usuario,
@@ -771,7 +771,7 @@ class AuthController {
      */
     static async requestTwoFactor(req, res, next) {
         try {
-            const code = String(Math.floor(100000 + Math.random() * 900000));
+            const code = String(crypto.randomInt(100000, 1000000));
             await redis.setex(`2fa:${req.user.id}`, 300, code);
 
             res.status(200).json({

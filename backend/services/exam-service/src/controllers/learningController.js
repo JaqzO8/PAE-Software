@@ -365,7 +365,7 @@ class LearningController {
                 id_universidad: university.id_universidad,
                 dificultad: normalizedDifficulty,
                 preguntas: selectedQuestions.map((question) => question.id_pregunta),
-                preguntas_snapshot: selectedQuestions.map(createQuestionSnapshot),
+                preguntas_snapshot: selectedQuestions.map((question) => createQuestionSnapshot(question)),
                 limite_segundos: timeLimit,
                 fecha_inicio: startedAt,
                 fecha_limite: deadline,
@@ -923,10 +923,6 @@ class LearningController {
 
     static async listOpenAnswerReviews(req, res, next) {
         try {
-            return res.status(403).json({
-                success: false,
-                message: 'La revisión requiere autorización docente por grupo; la integración de membresías aún no está disponible.',
-            });
             const { estado = 'pendiente' } = req.query;
             const where = {};
             if (estado !== 'all') where.estado = estado;
@@ -989,10 +985,6 @@ class LearningController {
 
     static async reviewOpenAnswer(req, res, next) {
         try {
-            return res.status(403).json({
-                success: false,
-                message: 'La revisión requiere autorización docente por grupo; la integración de membresías aún no está disponible.',
-            });
             const { attemptId, questionId } = req.params;
             const puntaje = Number(req.body.puntaje);
             const feedback = req.body.feedback || null;

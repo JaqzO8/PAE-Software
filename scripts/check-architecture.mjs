@@ -7,7 +7,10 @@ const services = path.join(root, 'backend/services');
 const failures = [];
 const walk = dir => readdirSync(dir, { withFileTypes: true }).flatMap(entry => {
     const filename = path.join(dir, entry.name);
-    return entry.isDirectory() ? walk(filename) : filename.endsWith('.js') ? [filename] : [];
+    if (entry.isDirectory()) {
+        return walk(filename);
+    }
+    return filename.endsWith('.js') ? [filename] : [];
 });
 let checked = 0;
 for (const entry of readdirSync(services, { withFileTypes: true }).filter(entry => entry.isDirectory())) {

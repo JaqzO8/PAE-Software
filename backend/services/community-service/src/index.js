@@ -40,7 +40,10 @@ if (require.main === module) {
         process.exit(1);
     });
 
-    startServer();
+    startServer().catch((err) => {
+        console.error('❌ Failed to start community service:', err);
+        process.exit(1);
+    });
 }
 
 module.exports = { startServer };

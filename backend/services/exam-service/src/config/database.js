@@ -32,9 +32,11 @@ const syncDatabase = async () => {
     await sequelize.sync();
     const migrationsPath = path.join(__dirname, '../../migrations');
     const migrations = readdirSync(migrationsPath).filter((file) => file.endsWith('.sql')).sort();
-    for (const file of migrations) {
-        await sequelize.query(readFileSync(path.join(migrationsPath, file), 'utf8'));
-    }
+    await migrations.reduce(async (previousPromise, file) => {
+        await previousPromise;
+        const sql = readFileSync(path.join(migrationsPath, file), 'utf8');
+        return sequelize.query(sql);
+    }, Promise.resolve());
     console.log('Base de datos de examenes sincronizada');
 };
 

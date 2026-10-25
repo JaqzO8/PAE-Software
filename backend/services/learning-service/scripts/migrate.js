@@ -5,7 +5,7 @@ const { createHash } = require('node:crypto');
 
 async function migrate(pool) {
     const sql = readFileSync(path.join(__dirname, '../migrations/001_gamification.sql'), 'utf8');
-    const checksum = createHash('sha256').update(sql.replace(/\r\n/g, '\n')).digest('hex');
+    const checksum = createHash('sha256').update(sql.replaceAll('\r\n', '\n')).digest('hex');
     const client = await pool.connect();
     try {
         await client.query('BEGIN');

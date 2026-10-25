@@ -5,6 +5,22 @@
  * - Solo permite modificar campos permitidos
  * - Protege identificador_unico, email, rol y hash de contraseñas contra modificaciones arbitrarias
  */
+function validateNameField(value, fieldLabel) {
+    const val = String(value).trim();
+    if (val.length < 2 || val.length > 100) {
+        const error = new Error(`Los ${fieldLabel} deben tener entre 2 y 100 caracteres`);
+        error.statusCode = 400;
+        throw error;
+    }
+    return val;
+}
+
+function sanitizeOptionalText(value) {
+    if (!value) return null;
+    const trimmed = String(value).trim();
+    return trimmed.length > 0 ? trimmed : null;
+}
+
 async function actualizarPerfil({
     userId,
     nombres,
@@ -28,38 +44,11 @@ async function actualizarPerfil({
     }
 
     const camposActualizables = {};
-
-    if (nombres !== undefined) {
-        const val = String(nombres).trim();
-        if (val.length < 2 || val.length > 100) {
-            const error = new Error('Los nombres deben tener entre 2 y 100 caracteres');
-            error.statusCode = 400;
-            throw error;
-        }
-        camposActualizables.nombres = val;
-    }
-
-    if (apellidos !== undefined) {
-        const val = String(apellidos).trim();
-        if (val.length < 2 || val.length > 100) {
-            const error = new Error('Los apellidos deben tener entre 2 y 100 caracteres');
-            error.statusCode = 400;
-            throw error;
-        }
-        camposActualizables.apellidos = val;
-    }
-
-    if (institucion !== undefined) {
-        camposActualizables.institucion = institucion ? String(institucion).trim() : null;
-    }
-
-    if (bio !== undefined) {
-        camposActualizables.bio = bio ? String(bio).trim() : null;
-    }
-
-    if (carrera_interes !== undefined) {
-        camposActualizables.carrera_interes = carrera_interes ? String(carrera_interes).trim() : null;
-    }
+    if (nombres !== undefined) camposActualizables.nombres = validateNameField(nombres, 'nombres');
+    if (apellidos !== undefined) camposActualizables.apellidos = validateNameField(apellidos, 'apellidos');
+    if (institucion !== undefined) camposActualizables.institucion = sanitizeOptionalText(institucion);
+    if (bio !== undefined) camposActualizables.bio = sanitizeOptionalText(bio);
+    if (carrera_interes !== undefined) camposActualizables.carrera_interes = sanitizeOptionalText(carrera_interes);
 
     const updatedUser = await userRepository.updateProfile(userId, camposActualizables);
 

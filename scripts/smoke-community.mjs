@@ -16,8 +16,11 @@ const api = async (route, { method = 'GET', account, data, status = 200 } = {}) 
     const headers = {};
     if (account) headers.Authorization = `Bearer ${account.token}`;
     const form = data instanceof FormData;
-    if (data && !form) headers['Content-Type'] = 'application/json';
-    const response = await fetch(`${origin}/api${route}`, { method, headers, body: data ? (form ? data : JSON.stringify(data)) : undefined });
+    let body;
+    if (data) {
+        body = form ? data : JSON.stringify(data);
+    }
+    const response = await fetch(`${origin}/api${route}`, { method, headers, body });
     assert.equal(response.status, status, `${method} ${route}: expected ${status}, received ${response.status}`);
     return response.headers.get('content-type')?.includes('json') ? response.json() : response.text();
 };

@@ -53,7 +53,10 @@ if (require.main === module) {
     });
 
     // Iniciar servidor
-    startServer();
+    startServer().catch((err) => {
+        console.error('❌ Failed to start auth service:', err);
+        process.exit(1);
+    });
 }
 
 module.exports = { startServer };

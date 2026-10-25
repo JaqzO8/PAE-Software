@@ -7,17 +7,19 @@ async function migrate(sequelize) {
         await sequelize.query("SELECT pg_advisory_xact_lock(hashtext('community_schema_migrations'))", { transaction });
         await sequelize.query('CREATE TABLE IF NOT EXISTS community_schema_migrations (name TEXT PRIMARY KEY, checksum TEXT NOT NULL, applied_at TIMESTAMPTZ NOT NULL DEFAULT now())', { transaction });
         const directory = path.join(__dirname, '../migrations');
-        for (const name of fs.readdirSync(directory).filter(name => /^\d+_.+\.sql$/.test(name)).sort()) {
+        const migrationFiles = fs.readdirSync(directory).filter(name => /^\d+_.+\.sql$/.test(name)).sort();
+        await migrationFiles.reduce(async (previousPromise, name) => {
+            await previousPromise;
             const sql = fs.readFileSync(path.join(directory, name), 'utf8');
             const checksum = createHash('sha256').update(sql).digest('hex');
             const [rows] = await sequelize.query('SELECT checksum FROM community_schema_migrations WHERE name = :name', { replacements: { name }, transaction });
             if (rows.length) {
                 if (rows[0].checksum !== checksum) throw new Error(`Migration changed: ${name}`);
-                continue;
+                return;
             }
             await sequelize.query(sql, { transaction });
             await sequelize.query('INSERT INTO community_schema_migrations(name, checksum) VALUES (:name, :checksum)', { replacements: { name, checksum }, transaction });
-        }
+        }, Promise.resolve());
     });
 }
 if (require.main === module) {

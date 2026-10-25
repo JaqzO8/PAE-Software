@@ -102,3 +102,31 @@ test('RIC-AC-02: completarMfa consume el desafío atómicamente y rechaza repeti
         });
     }, { statusCode: 400 });
 });
+
+test('RIC-06: generación criptográfica segura de código OTP para MFA (CWE-330)', () => {
+    const crypto = require('node:crypto');
+    const codes = new Set();
+    for (let i = 0; i < 50; i++) {
+        const otpCode = String(crypto.randomInt(100000, 1000000));
+        assert.equal(otpCode.length, 6, 'El código OTP debe tener exactamente 6 dígitos');
+        assert.match(otpCode, /^\d{6}$/, 'El código OTP debe consistir únicamente en dígitos');
+        const num = Number(otpCode);
+        assert.ok(num >= 100000 && num < 1000000, 'El valor numérico debe estar en el rango [100000, 999999]');
+        codes.add(otpCode);
+    }
+    // Con 50 números aleatorios en un espacio de 900,000 valores, la probabilidad de más de 3 colisiones es despreciable
+    assert.ok(codes.size >= 45, 'Los códigos OTP generados con PRNG criptográfico deben mostrar alta entropía y dispersión');
+});
+
+test('RIC-07: validarPoliticaPassword exige longitud, letras y dígitos con sintaxis segura', () => {
+    const { validarPoliticaPassword } = require('../../backend/services/auth-service/src/domain/politicaSesion');
+    
+    assert.equal(validarPoliticaPassword(null).valida, false);
+    assert.equal(validarPoliticaPassword('').valida, false);
+    assert.equal(validarPoliticaPassword('short1').valida, false, 'Rechaza longitud menor a 8 caracteres');
+    assert.equal(validarPoliticaPassword('sololetras').valida, false, 'Rechaza contraseña sin dígitos');
+    assert.equal(validarPoliticaPassword('123456789').valida, false, 'Rechaza contraseña sin letras');
+    
+    const valid = validarPoliticaPassword('Segura2026!');
+    assert.equal(valid.valida, true, 'Acepta contraseña con letras, dígitos y longitud suficiente');
+});

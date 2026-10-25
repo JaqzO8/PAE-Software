@@ -27,20 +27,18 @@ const ExamView = () => {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(
     shouldRestoreCached ? cachedExam?.currentQuestionIndex || 0 : 0
   );
-  const [answers, setAnswers] = useState<AnswerValue[]>(
-    simulacro
-      ? shouldRestoreCached
-        ? cachedExam?.answers || new Array(simulacro.questions.length).fill(null)
-        : new Array(simulacro.questions.length).fill(null)
-      : []
-  );
-  const [timeRemaining, setTimeRemaining] = useState(
-    simulacro
-      ? simulacro.deadline
-        ? Math.max(0, Math.ceil((new Date(simulacro.deadline).getTime() - Date.now()) / 1000))
-        : simulacro.timeLimit
-      : 0
-  );
+  const [answers, setAnswers] = useState<AnswerValue[]>(() => {
+    if (!simulacro) return [];
+    if (shouldRestoreCached && cachedExam?.answers) return cachedExam.answers;
+    return new Array(simulacro.questions.length).fill(null);
+  });
+  const [timeRemaining, setTimeRemaining] = useState<number>(() => {
+    if (!simulacro) return 0;
+    if (simulacro.deadline) {
+      return Math.max(0, Math.ceil((new Date(simulacro.deadline).getTime() - Date.now()) / 1000));
+    }
+    return simulacro.timeLimit || 0;
+  });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [markedForReview, setMarkedForReview] = useState<Set<number>>(new Set());
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);

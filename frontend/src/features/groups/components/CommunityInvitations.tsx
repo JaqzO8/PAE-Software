@@ -2,7 +2,11 @@ import { useEffect, useState } from "react";
 import { Button } from "../../../desingSystem/primitives";
 import { invitationsService, invitationError, type CommunityInvitation } from "../../community/services/invitationsService";
 
-export function CommunityInvitations({ onAccepted }: { onAccepted: () => void }) {
+interface CommunityInvitationsProps {
+  readonly onAccepted: () => void;
+}
+
+export function CommunityInvitations({ onAccepted }: CommunityInvitationsProps) {
   const [invitations, setInvitations] = useState<CommunityInvitation[]>([]);
   const [loading, setLoading] = useState(true);
   const [pending, setPending] = useState<number | null>(null);
@@ -30,9 +34,9 @@ export function CommunityInvitations({ onAccepted }: { onAccepted: () => void })
   return (
     <section aria-labelledby="community-invitations-title" className="rounded-xl border border-neutral-200 p-5 space-y-3">
       <h2 id="community-invitations-title" className="text-xl font-semibold">Invitaciones a comunidades</h2>
-      {loading && <p role="status">Cargando invitaciones…</p>}
+      {loading && <output className="block">Cargando invitaciones…</output>}
       {error && <div role="alert"><p>{error}</p><Button variant="outline" onClick={() => { setError(""); setLoading(true); setReload(value => value + 1); }}>Actualizar invitaciones</Button></div>}
-      {notice && <p role="status">{notice}</p>}
+      {notice && <output className="block">{notice}</output>}
       {!loading && !error && invitations.length === 0 && <p className="text-muted-foreground">No tienes invitaciones pendientes.</p>}
       <ul className="space-y-3">
         {invitations.map(invitation => (

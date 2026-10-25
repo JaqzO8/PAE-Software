@@ -31,7 +31,12 @@ function createForumUseCases({ transaction }) {
             const body = text(content, 1, 4000);
             if (typeof clientId !== 'string' || !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(clientId)) fail('INVALID_REQUEST_ID', 'Identificador de respuesta inválido');
             const previous = await repo.commentRequest(thread.id, actor.id, clientId);
-            if (previous) { if (previous.body !== body) fail('REQUEST_CONFLICT', 'Reintento incompatible', 409); return previous; }
+            if (previous) {
+                if (previous.body !== body) {
+                    fail('REQUEST_CONFLICT', 'Reintento incompatible', 409);
+                }
+                return previous;
+            }
             return repo.createComment(thread.id, actor.id, body, clientId);
         }),
         like: ({ actor, id, liked }) => inThread(id, actor, async (repo, thread) => {
