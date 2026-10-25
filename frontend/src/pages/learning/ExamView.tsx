@@ -35,7 +35,11 @@ const ExamView = () => {
       : []
   );
   const [timeRemaining, setTimeRemaining] = useState(
-    simulacro ? (shouldRestoreCached ? cachedExam?.timeRemaining || simulacro.timeLimit : simulacro.timeLimit) : 0
+    simulacro
+      ? simulacro.deadline
+        ? Math.max(0, Math.ceil((new Date(simulacro.deadline).getTime() - Date.now()) / 1000))
+        : simulacro.timeLimit
+      : 0
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [markedForReview, setMarkedForReview] = useState<Set<number>>(new Set());

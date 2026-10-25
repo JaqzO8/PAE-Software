@@ -1,0 +1,64 @@
+# Applied on top of pruebas_pae's original Compose files by run-pruebas-pae.mjs.
+services:
+  nginx-gateway:
+    build:
+      context: ${PAE_SOURCE_ROOT:?Set PAE_SOURCE_ROOT}/backend/nginx
+    volumes:
+      - ${PAE_SOURCE_ROOT}/backend/nginx/conf/nginx.conf:/etc/nginx/nginx.conf:ro
+  auth-service:
+    build:
+      context: ${PAE_SOURCE_ROOT:?Set PAE_SOURCE_ROOT}/backend/services/auth-service
+  content-service:
+    build:
+      context: ${PAE_SOURCE_ROOT}/backend/services/content-service
+  exam-service:
+    build:
+      context: ${PAE_SOURCE_ROOT}/backend/services/exam-service
+  community-service:
+    build:
+      context: ${PAE_SOURCE_ROOT}/backend/services/community-service
+    environment:
+      COMMUNITY_INVITATION_TTL_HOURS: 168
+  frontend:
+    build:
+      context: ${PAE_SOURCE_ROOT}/frontend
+  learning-service:
+    build:
+      context: ${PAE_SOURCE_ROOT}/backend/services/learning-service
+    environment:
+      LEARNING_PORT: 3006
+      LEARNING_HOST: 0.0.0.0
+      PGHOST: learning-db
+      PGPORT: 5432
+      PGDATABASE: learning_pilot
+      PGUSER: learning_pilot
+      PGPASSWORD: ${LEARNING_DB_PASSWORD:?Pilot password required}
+    ports:
+      - "127.0.0.1:3006:3006"
+    depends_on:
+      learning-db:
+        condition: service_healthy
+    networks: [pae-network]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3006/ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+  learning-db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: learning_pilot
+      POSTGRES_USER: learning_pilot
+      POSTGRES_PASSWORD: ${LEARNING_DB_PASSWORD:?Pilot password required}
+    volumes:
+      - learning-pilot-data:/var/lib/postgresql/data
+    networks: [pae-network]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U learning_pilot -d learning_pilot"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+volumes:
+  learning-pilot-data:

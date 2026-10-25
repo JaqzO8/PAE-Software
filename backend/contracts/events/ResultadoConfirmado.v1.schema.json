@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:pae:event:ResultadoConfirmado:v1",
+  "title": "ResultadoConfirmado.v1 — piloto, sin recalificaciones",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["eventId", "type", "schemaVersion", "producer", "occurredAt", "correlationId", "data"],
+  "properties": {
+    "eventId": { "type": "string", "format": "uuid" },
+    "type": { "const": "ResultadoConfirmado.v1" },
+    "schemaVersion": { "const": 1 },
+    "producer": { "const": "evaluation" },
+    "occurredAt": { "type": "string", "format": "date-time", "pattern": "Z$" },
+    "correlationId": { "type": "string", "format": "uuid" },
+    "data": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["attemptId", "userId", "resultVersion", "status"],
+      "properties": {
+        "attemptId": { "type": "string", "pattern": "^[1-9][0-9]{0,18}$" },
+        "userId": { "type": "string", "pattern": "^[1-9][0-9]{0,18}$" },
+        "resultVersion": { "const": 1 },
+        "status": { "const": "confirmed" }
+      }
+    }
+  }
+}

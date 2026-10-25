@@ -1,8 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const AuthController = require('../controllers/authController');
+const { searchPublicUsers } = require('../interfaces/http/publicUsers');
 const PlatformController = require('../controllers/platformController');
-const { verifyToken } = require('../middlewares/authMiddleware');
+const { verifyToken, verifyRole } = require('../middlewares/authMiddleware');
 const {
     validateRegister,
     validateLogin,
@@ -12,7 +13,7 @@ const {
 
 /**
  * POST /api/auth/register
- * Registro de nuevos usuarios
+ * Registro de nuevos usuarios (Siempre estudiante, sin autoasignación de rol docente)
  */
 router.post(
     '/register',
@@ -23,7 +24,7 @@ router.post(
 
 /**
  * POST /api/auth/login
- * Inicio de sesión
+ * Inicio de sesión con mitigación de enumeración y soporte para desafío MFA
  */
 router.post(
     '/login',
@@ -31,6 +32,12 @@ router.post(
     handleValidationErrors,
     AuthController.login
 );
+
+/**
+ * POST /api/auth/mfa/complete
+ * Completa la verificación de dos factores y emite la sesión definitiva
+ */
+router.post('/mfa/complete', AuthController.completeMfaLogin);
 
 router.post('/quick-login', AuthController.quickLogin);
 
@@ -67,12 +74,22 @@ router.get(
     AuthController.verify
 );
 
+router.get('/users/search', verifyToken, searchPublicUsers);
 router.put('/profile', verifyToken, AuthController.updateProfile);
 router.put('/password', verifyToken, validateUpdatePassword, handleValidationErrors, AuthController.updatePassword);
 router.get('/sessions', verifyToken, AuthController.getSessions);
 router.post('/logout-all', verifyToken, AuthController.logoutAll);
 router.post('/2fa/request', verifyToken, AuthController.requestTwoFactor);
 router.post('/2fa/verify', verifyToken, AuthController.verifyTwoFactor);
+
+// Habilitación y gestión de roles docentes (RIC-02, RIC-03, M1-S03)
+router.post('/teacher/request', verifyToken, AuthController.requestTeacherRole);
+router.get('/teacher/requests', verifyToken, verifyRole('admin'), AuthController.listTeacherRequests);
+router.post('/teacher/requests/:id/approve', verifyToken, verifyRole('admin'), AuthController.approveTeacherRequest);
+router.post('/teacher/requests/:id/reject', verifyToken, verifyRole('admin'), AuthController.rejectTeacherRequest);
+router.post('/admin/assign-role', verifyToken, verifyRole('admin'), AuthController.assignRole);
+
+// Preferencias de usuario, soporte y privacidad (M8)
 router.get('/preferences', verifyToken, PlatformController.getPreferences);
 router.put('/preferences', verifyToken, PlatformController.updatePreferences);
 router.get('/support/tickets', verifyToken, PlatformController.listSupportTickets);
@@ -82,7 +99,7 @@ router.post('/privacy/delete-request', verifyToken, PlatformController.requestAc
 
 /**
  * GET /api/auth/user/:id
- * Datos publicos minimos de usuario para otros servicios
+ * Datos públicos mínimos de usuario para otros servicios
  */
 router.get(
     '/user/:id',

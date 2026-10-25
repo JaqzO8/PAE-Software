@@ -62,9 +62,12 @@ const verifyTeacherOfCommunity = async (req, res, next) => {
  */
 const verifyMemberOfCommunity = async (req, res, next) => {
     try {
-        const { MiembroComunidad } = require('../models');
+        const { MiembroComunidad, Comunidad } = require('../models');
         const communityId = req.params.id || req.body.comunidad_id;
         const userId = req.user.id;
+
+        const community = await Comunidad.findOne({ where: { id_comunidad: communityId, activa: true } });
+        if (!community) return res.status(404).json({ success: false, message: 'Comunidad no encontrada' });
 
         const member = await MiembroComunidad.findOne({
             where: {

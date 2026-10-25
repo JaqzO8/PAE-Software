@@ -3,16 +3,13 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
-  Send,
   MessageSquare,
   HelpCircle,
   BarChart3,
-  CheckCircle,
   TrendingUp,
 } from "lucide-react";
 import {
   Button,
-  Input,
   Avatar,
   AvatarImage,
   AvatarFallback,
@@ -22,13 +19,14 @@ import {
   TabsContent,
   Card,
   Skeleton,
-  ScrollArea,
 } from "../../../desingSystem/primitives";
 import { ParticipantsSheet } from "../components/ParticipantsSheet";
+import { ForumBoard } from '../../forums/components/ForumBoard';
+import { CommunityChat } from "../components/CommunityChat";
+import { CommunityOwnerTools } from "../components/CommunityOwnerTools";
 import {
   getGroupDetail,
   leaveGroup,
-  sendGroupMessage,
   type GroupDetail as GroupDetailType,
 } from "../services/groupsService";
 import { useToast } from "../../../hooks/useToast";
@@ -44,7 +42,6 @@ export default function GroupDetail() {
   const [group, setGroup] = useState<GroupDetailType | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [showParticipants, setShowParticipants] = useState(false);
-  const [message, setMessage] = useState("");
 
   // ✅ Determinar si el usuario es docente
   const isTeacher = user?.rol === "docente";
@@ -94,13 +91,6 @@ export default function GroupDetail() {
     };
   }, [id, toast]);
 
-  const handleSendMessage = async () => {
-    if (!message.trim()) return;
-    await sendGroupMessage(id!, message.trim());
-    setMessage("");
-    await loadGroupDetail();
-  };
-
   const handleLeaveGroup = async () => {
     if (id) await leaveGroup(id);
     toast({
@@ -139,6 +129,7 @@ export default function GroupDetail() {
         Volver a Mis Comunidades
       </Button>
 
+      {isTeacher && group.ownerId === String(user?.id) && <CommunityOwnerTools key={group.id} communityId={group.id} ownerId={String(user?.id)} participants={group.participants} onChanged={loadGroupDetail} onClosed={() => navigate(`${basePath}/grupos`)} />}
       {/* Contenedor Principal estilo Chat */}
       <div className={styles.chatContainer}>
         {/* Header Clickeable */}
@@ -180,88 +171,13 @@ export default function GroupDetail() {
             </TabsTrigger>
           </TabsList>
 
-          {/* TAB 1: Chat */}
-          <TabsContent value="chat" className="flex-1 flex flex-col m-0">
-            <ScrollArea className={styles.chatMessages}>
-              {group.messages.map((msg) => (
-                <div
-                  key={msg.id}
-                  className={`${styles.messageBubble} ${
-                    msg.authorRole === "docente" ? styles.messageBubbleTeacher : ""
-                  }`}
-                >
-                  <Avatar className={styles.messageAvatar}>
-                    <AvatarImage src={msg.avatar} alt={msg.author} />
-                    <AvatarFallback className="bg-neutral-200 text-neutral-600 text-xs font-bold">
-                      {msg.author.substring(0, 2).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className={styles.messageContent}>
-                    <span className={styles.messageAuthor}>{msg.author}</span>
-                    <div
-                      className={`${styles.messageText} ${
-                        msg.authorRole === "docente" ? styles.messageTextTeacher : ""
-                      }`}
-                    >
-                      {msg.content}
-                    </div>
-                    <span className={styles.messageTime}>{msg.timestamp}</span>
-                  </div>
-                </div>
-              ))}
-            </ScrollArea>
-
-            {/* Input de Mensaje */}
-            <div className={styles.chatInput}>
-              <Input
-                placeholder="Escribe un mensaje..."
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
-                className={styles.chatInputField}
-              />
-              <Button
-                onClick={handleSendMessage}
-                disabled={!message.trim()}
-                className={styles.chatSendButton}
-              >
-                <Send className="h-5 w-5" />
-              </Button>
-            </div>
+          <TabsContent value="chat" className="flex-1 m-0">
+            <CommunityChat key={`${group.id}:${user?.id}`} communityId={group.id} userId={String(user?.id)} isOwner={group.ownerId === String(user?.id)} />
           </TabsContent>
 
           {/* TAB 2: Foros */}
           <TabsContent value="forums" className="flex-1 m-0">
-            <div className={styles.forumList}>
-              {group.forums.map((forum) => (
-                <div key={forum.id} className={styles.forumItem}>
-                  <div className={styles.forumHeader}>
-                    <Avatar className={styles.forumAvatar}>
-                      <AvatarImage src={forum.authorAvatar} alt={forum.author} />
-                      <AvatarFallback className="bg-neutral-100 text-neutral-600 font-bold text-xs">
-                        {forum.author.substring(0, 2).toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <h3 className={styles.forumTitle}>{forum.title}</h3>
-                      <div className={styles.forumMeta}>
-                        <span>Por {forum.author}</span>
-                        <span>•</span>
-                        <span>{forum.replies} respuestas</span>
-                        <span>•</span>
-                        <span>{forum.lastReply}</span>
-                      </div>
-                    </div>
-                    {forum.isResolved && (
-                      <div className={styles.forumResolved}>
-                        <CheckCircle className="h-4 w-4" />
-                        Resuelto
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
+            <ForumBoard key={group.id} groupId={group.id} />
           </TabsContent>
 
           {/* TAB 3: Analítica (Solo Docente) */}
@@ -314,7 +230,7 @@ export default function GroupDetail() {
                     </p>
                     <TrendingUp className="h-5 w-5 text-success-progress" />
                   </div>
-                  <p className={styles.analyticsSubtext}>+5% vs mes anterior</p>
+                  
                 </Card>
 
                 {/* Top Contributors */}
@@ -364,7 +280,7 @@ export default function GroupDetail() {
         onOpenChange={setShowParticipants}
         participants={group.participants}
         groupName={group.name}
-        onLeave={handleLeaveGroup}
+        onLeave={group.ownerId === String(user?.id) ? undefined : handleLeaveGroup}
       />
     </div>
   );

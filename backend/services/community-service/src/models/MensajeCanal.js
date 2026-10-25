@@ -2,6 +2,12 @@ const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/database');
 
 const MensajeCanal = sequelize.define('mensajes_canal', {
+    client_id: { type: DataTypes.UUID, allowNull: true },
+    request_hash: { type: DataTypes.STRING(64), allowNull: true },
+    version: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 1 },
+    fecha_eliminacion: { type: DataTypes.DATE, allowNull: true },
+    eliminado_por: { type: DataTypes.INTEGER, allowNull: true },
+    motivo_eliminacion: { type: DataTypes.STRING(1000), allowNull: true },
     id_mensaje: {
         type: DataTypes.INTEGER,
         primaryKey: true,
@@ -44,6 +50,7 @@ const MensajeCanal = sequelize.define('mensajes_canal', {
     tableName: 'mensajes_canal',
     timestamps: false,
     indexes: [
+        { name: 'message_client_request', unique: true, fields: ['comunidad_id', 'usuario_id', 'client_id'] },
         { fields: ['comunidad_id'] },
         { fields: ['usuario_id'] },
         { fields: ['fecha_envio'] },

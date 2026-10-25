@@ -4,9 +4,10 @@ import { Skeleton } from "../../../desingSystem/primitives";
 import { GroupCard } from "./GroupCard";
 import { useStudentGroups } from "../hooks/useStudentGroups";
 import styles from "./groups.module.css";
+import { CommunityInvitations } from "./CommunityInvitations";
 
 export function StudentGroupList() {
-  const { groups, isLoading } = useStudentGroups();
+  const { groups, isLoading, refresh } = useStudentGroups();
 
   if (isLoading) {
     return (
@@ -30,6 +31,7 @@ export function StudentGroupList() {
         </div>
       </div>
 
+      <CommunityInvitations onAccepted={refresh} />
       {groups.length === 0 ? (
         <div className="text-center py-16 text-muted-foreground border-2 border-dashed border-neutral-200 rounded-xl bg-neutral-50/50">
           <Users className="h-12 w-12 mx-auto mb-4 text-neutral-300" />

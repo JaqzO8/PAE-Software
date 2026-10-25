@@ -1,4 +1,6 @@
 const { Sequelize } = require('sequelize');
+const { readFileSync, readdirSync } = require('node:fs');
+const path = require('node:path');
 const config = require('./env');
 
 const sequelize = new Sequelize({
@@ -28,6 +30,11 @@ const testConnection = async () => {
 
 const syncDatabase = async () => {
     await sequelize.sync();
+    const migrationsPath = path.join(__dirname, '../../migrations');
+    const migrations = readdirSync(migrationsPath).filter((file) => file.endsWith('.sql')).sort();
+    for (const file of migrations) {
+        await sequelize.query(readFileSync(path.join(migrationsPath, file), 'utf8'));
+    }
     console.log('Base de datos de examenes sincronizada');
 };
 

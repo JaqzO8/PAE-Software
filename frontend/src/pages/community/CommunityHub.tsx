@@ -1,3 +1,4 @@
+import { FriendsPanel } from "../../features/community/components/FriendsPanel";
 import { useEffect, useMemo, useState } from "react";
 import {
   Activity,
@@ -202,6 +203,8 @@ export default function CommunityHubPage() {
           Actualizar
         </Button>
       </div>
+
+      <FriendsPanel key={String(user?.id)} userId={String(user?.id)} />
 
       <div className="grid gap-4 md:grid-cols-3">
         <Card className="border-neutral-200">

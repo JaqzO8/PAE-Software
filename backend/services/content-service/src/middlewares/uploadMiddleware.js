@@ -7,9 +7,13 @@ const config = require('../config/env');
 
 // ✅ CORRECCIÓN: Asegurar que los directorios existan
 const ensureDirectoryExists = (dir) => {
-    if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-        console.log(`✅ Directorio creado: ${dir}`);
+    try {
+        if (!fs.existsSync(dir)) {
+            fs.mkdirSync(dir, { recursive: true });
+            console.log(`✅ Directorio creado: ${dir}`);
+        }
+    } catch (err) {
+        console.warn(`No se pudo crear directorio de subida ${dir}: ${err.message}`);
     }
 };
 

@@ -24,6 +24,7 @@ const SimulacroAttempt = sequelize.define('simulacro_intentos', {
         allowNull: false,
         defaultValue: [],
     },
+    preguntas_snapshot: { type: DataTypes.JSONB, allowNull: true },
     respuestas: {
         type: DataTypes.JSONB,
         allowNull: false,
@@ -38,6 +39,10 @@ const SimulacroAttempt = sequelize.define('simulacro_intentos', {
         type: DataTypes.INTEGER,
         allowNull: false,
     },
+    fecha_limite: { type: DataTypes.DATE, allowNull: true },
+    clave_idempotencia: { type: DataTypes.STRING(128), allowNull: true },
+    hash_solicitud: { type: DataTypes.STRING(64), allowNull: true },
+    resultado_confirmado: { type: DataTypes.JSONB, allowNull: true },
     tiempo_usado: {
         type: DataTypes.INTEGER,
         allowNull: false,

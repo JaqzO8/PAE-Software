@@ -14,6 +14,11 @@ export default defineConfig({
   server: {
     host: '0.0.0.0', // Permite acceso externo
     port: 5173,
+    proxy: {
+      '/api': { target: process.env.PAE_API_PROXY || 'http://localhost:3000', changeOrigin: true },
+      '/community-socket': { target: process.env.PAE_API_PROXY || 'http://localhost:3000', ws: true },
+      '/learning-socket': { target: process.env.PAE_API_PROXY || 'http://localhost:3000', ws: true },
+    },
     watch: {
       usePolling: true, // Necesario para hot-reload en Docker
     },

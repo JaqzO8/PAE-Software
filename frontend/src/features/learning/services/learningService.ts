@@ -35,6 +35,7 @@ export interface SimulacroResult {
   id: string;
   questions: SimulacroQuestion[];
   timeLimit: number; // en segundos
+  deadline?: string;
   config: SimulacroConfig;
 }
 
@@ -49,7 +50,10 @@ export interface SimulacroScore {
   totalQuestions: number;
   correctAnswers: number;
   timeSpent: number;
-  percentile: number;
+  percentile: number | null;
+  status?: "pending_review" | "confirmed";
+  resultVersion?: number | null;
+  expired?: boolean;
   requiresManualReview?: boolean;
   offlinePending?: boolean;
   offlineAttemptId?: string;
@@ -611,7 +615,9 @@ const startSimulacroApi = async (config: SimulacroConfig): Promise<SimulacroResu
 };
 
 const submitSimulacroApi = async (submission: SimulacroSubmission): Promise<SimulacroScore> => {
-  const response = await api.post("/learning/simulacro/submit", submission);
+  const response = await api.post("/learning/simulacro/submit", submission, {
+    headers: { "Idempotency-Key": `simulacro-${submission.simulacroId}-submit-v1` },
+  });
   return response.data;
 };
 

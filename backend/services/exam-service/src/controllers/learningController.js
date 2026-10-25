@@ -1,16 +1,21 @@
 const { Op } = require('sequelize');
+const { randomUUID } = require('node:crypto');
 const {
     University,
     Question,
     SimulacroAttempt,
     SavedQuestion,
     OpenAnswerReview,
+    OpenAnswerReviewAudit,
     ChallengeRoom,
     ChallengeMatch,
     TriviaRoom,
     TriviaMatch,
     AnalyticsSetting,
+    ExamOutbox,
 } = require('../models');
+const { sequelize } = require('../config/database');
+const { createQuestionSnapshot, hashSubmission, scoreSnapshot, scoreReviewedAttempt, toPublicQuestion } = require('../services/attemptRules');
 const AchievementService = require('../services/achievementService');
 const GamificationService = require('../services/gamificationService');
 const { hasAlreadyAnswered } = require('../services/liveAnswerRules');
@@ -352,13 +357,18 @@ class LearningController {
 
             const selectedQuestions = shuffle(questions).slice(0, Math.min(Number(questionCount), questions.length));
             const timeLimit = normalizedDifficulty === 'facil' ? 9000 : normalizedDifficulty === 'medio' ? 7200 : 5760;
+            const startedAt = new Date();
+            const deadline = new Date(startedAt.getTime() + timeLimit * 1000);
 
             const attempt = await SimulacroAttempt.create({
                 id_usuario: req.user.id,
                 id_universidad: university.id_universidad,
                 dificultad: normalizedDifficulty,
                 preguntas: selectedQuestions.map((question) => question.id_pregunta),
+                preguntas_snapshot: selectedQuestions.map(createQuestionSnapshot),
                 limite_segundos: timeLimit,
+                fecha_inicio: startedAt,
+                fecha_limite: deadline,
                 total_preguntas: selectedQuestions.length,
             });
 
@@ -366,6 +376,7 @@ class LearningController {
                 id: String(attempt.id_intento),
                 questions: selectedQuestions.map(toFrontendQuestion),
                 timeLimit,
+                deadline: deadline.toISOString(),
                 config: {
                     universityId,
                     difficulty: normalizedDifficulty,
@@ -378,88 +389,98 @@ class LearningController {
 
     static async submitSimulacro(req, res, next) {
         try {
-            const { simulacroId, answers, timeSpent = 0 } = req.body;
-
-            const attempt = await SimulacroAttempt.findOne({
-                where: { id_intento: simulacroId, id_usuario: req.user.id },
-            });
-
-            if (!attempt) {
-                return res.status(404).json({ success: false, message: 'Simulacro no encontrado' });
+            const { simulacroId, answers } = req.body;
+            const idempotencyKey = String(req.get('Idempotency-Key') || '').trim();
+            if (!idempotencyKey || idempotencyKey.length > 128) {
+                return res.status(400).json({ success: false, message: 'Se requiere una clave de idempotencia válida' });
+            }
+            if (!Array.isArray(answers) || answers.length > 200 || answers.some((answer) => (
+                answer !== null
+                && typeof answer !== 'string'
+                && (typeof answer !== 'number' || !Number.isFinite(answer))
+            ) || (typeof answer === 'string' && answer.length > 20000))) {
+                return res.status(400).json({ success: false, message: 'Respuestas inválidas' });
             }
 
-            if (attempt.estado === 'finalizado') {
-                return res.status(409).json({ success: false, message: 'El simulacro ya fue enviado' });
-            }
+            const payloadHash = hashSubmission(answers);
+            const result = await sequelize.transaction(async (transaction) => {
+                const attempt = await SimulacroAttempt.findOne({
+                    where: { id_intento: simulacroId, id_usuario: req.user.id },
+                    transaction,
+                    lock: transaction.LOCK.UPDATE,
+                });
+                if (!attempt) return { status: 404, body: { success: false, message: 'Simulacro no encontrado' } };
 
-            const questions = await Question.findAll({
-                where: { id_pregunta: { [Op.in]: attempt.preguntas } },
-            });
-
-            const byId = new Map(questions.map((question) => [question.id_pregunta, question]));
-            const ordered = attempt.preguntas.map((id) => byId.get(id)).filter(Boolean);
-            let correctAnswers = 0;
-            let pendingManualReviews = 0;
-
-            const solutions = ordered.map((question, index) => {
-                const userAnswer = Array.isArray(answers) ? answers[index] : -1;
-                const isCorrect = question.tipo === 'opcion_multiple' && userAnswer === question.respuesta_correcta;
-                if (isCorrect) correctAnswers += 1;
-                if (question.tipo === 'abierta' && !isBlankAnswer(userAnswer) && userAnswer !== -1) {
-                    pendingManualReviews += 1;
+                if (attempt.estado === 'finalizado') {
+                    if (attempt.clave_idempotencia === idempotencyKey && attempt.hash_solicitud === payloadHash) {
+                        return { status: 200, body: attempt.resultado_confirmado };
+                    }
+                    return { status: 409, body: { success: false, message: 'El simulacro ya fue enviado con otra solicitud' } };
                 }
 
-                return {
-                    question: toFrontendQuestion(question, { includeAnswer: true }),
-                    userAnswer,
-                    isCorrect,
-                    requiresManualReview: question.tipo === 'abierta',
+                const now = new Date();
+                const deadline = attempt.fecha_limite || new Date(new Date(attempt.fecha_inicio).getTime() + Number(attempt.limite_segundos) * 1000);
+                const expired = now.getTime() > new Date(deadline).getTime();
+                const snapshot = Array.isArray(attempt.preguntas_snapshot) && attempt.preguntas_snapshot.length > 0
+                    ? attempt.preguntas_snapshot
+                    : await Question.findAll({
+                        where: { id_pregunta: { [Op.in]: attempt.preguntas } },
+                        transaction,
+                    }).then((questions) => {
+                        const byId = new Map(questions.map((question) => [String(question.id_pregunta), createQuestionSnapshot(question)]));
+                        return attempt.preguntas.map((id) => byId.get(String(id))).filter(Boolean);
+                    });
+                const acceptedAnswers = expired ? [] : answers;
+                const scored = scoreSnapshot(snapshot, acceptedAnswers, now);
+                const elapsedSeconds = Math.max(0, Math.min(Number(attempt.limite_segundos), Math.floor((now.getTime() - new Date(attempt.fecha_inicio).getTime()) / 1000)));
+                scored.timeSpent = elapsedSeconds;
+                const event = {
+                    eventId: randomUUID(),
+                    type: 'ResultadoConfirmado.v1',
+                    schemaVersion: 1,
+                    producer: 'evaluation',
+                    correlationId: randomUUID(),
+                    occurredAt: now.toISOString(),
+                    data: { attemptId: String(attempt.id_intento), userId: String(req.user.id), resultVersion: 1, status: 'confirmed' },
                 };
+                const persisted = { ...scored, expired, newAchievements: [], gamification: null };
+                const answersForStorage = snapshot.map((_, index) => acceptedAnswers[index] ?? -1);
+
+                await attempt.update({
+                    respuestas: answersForStorage,
+                    estado: 'finalizado',
+                    tiempo_usado: elapsedSeconds,
+                    puntaje: scored.score,
+                    correctas: scored.correctAnswers,
+                    total_preguntas: scored.totalQuestions,
+                    fecha_fin: now,
+                    clave_idempotencia: idempotencyKey,
+                    hash_solicitud: payloadHash,
+                    resultado_confirmado: persisted,
+                }, { transaction });
+
+                const openReviews = snapshot
+                    .map((question, index) => ({ question, answer: acceptedAnswers[index] }))
+                    .filter(({ question, answer }) => question.type === 'abierta' && !isBlankAnswer(answer) && answer !== -1)
+                    .map(({ question, answer }) => ({
+                        id_intento: attempt.id_intento,
+                        id_pregunta: Number(question.id),
+                        id_estudiante: req.user.id,
+                        respuesta_texto: answerToText(answer),
+                    }));
+                if (openReviews.length > 0) await OpenAnswerReview.bulkCreate(openReviews, { ignoreDuplicates: true, transaction });
+                if (!scored.requiresManualReview) {
+                    await ExamOutbox.create({
+                        event_id: event.eventId,
+                        aggregate_id: String(attempt.id_intento),
+                        event_type: event.type,
+                        payload: event,
+                    }, { transaction });
+                }
+                return { status: 200, body: persisted };
             });
 
-            const score = Math.round((correctAnswers / Math.max(ordered.length, 1)) * 100);
-            const percentile = Math.min(99, Math.round((correctAnswers / Math.max(ordered.length, 1)) * 100));
-
-            await attempt.update({
-                respuestas: Array.isArray(answers) ? answers : [],
-                estado: 'finalizado',
-                tiempo_usado: Number(timeSpent),
-                puntaje: score,
-                correctas: correctAnswers,
-                total_preguntas: ordered.length,
-                fecha_fin: new Date(),
-            });
-
-            const openReviews = ordered
-                .map((question, index) => ({
-                    question,
-                    answer: Array.isArray(answers) ? answers[index] : '',
-                }))
-                .filter(({ question, answer }) => question.tipo === 'abierta' && !isBlankAnswer(answer) && answer !== -1)
-                .map(({ question, answer }) => ({
-                    id_intento: attempt.id_intento,
-                    id_pregunta: question.id_pregunta,
-                    id_estudiante: req.user.id,
-                    respuesta_texto: answerToText(answer),
-                }));
-
-            if (openReviews.length > 0) {
-                await OpenAnswerReview.bulkCreate(openReviews, { ignoreDuplicates: true });
-            }
-            const newAchievements = await AchievementService.evaluateUser(req.user.id, attempt);
-            const gamification = await GamificationService.processSimulacroSubmission(req.user, attempt, newAchievements);
-
-            return res.status(200).json({
-                score,
-                totalQuestions: ordered.length,
-                correctAnswers,
-                timeSpent: Number(timeSpent),
-                percentile,
-                requiresManualReview: pendingManualReviews > 0,
-                newAchievements,
-                gamification,
-                solutions,
-            });
+            return res.status(result.status).json(result.body);
         } catch (error) {
             return next(error);
         }
@@ -506,7 +527,24 @@ class LearningController {
 
             return res.status(200).json({
                 success: true,
-                data: attempts,
+                data: attempts.map((attempt) => ({
+                    id_intento: attempt.id_intento,
+                    dificultad: attempt.dificultad,
+                    estado: attempt.estado,
+                    estado_resultado: attempt.resultado_confirmado?.status || null,
+                    tiempo_usado: attempt.tiempo_usado,
+                    puntaje: attempt.puntaje,
+                    correctas: attempt.correctas,
+                    total_preguntas: attempt.total_preguntas,
+                    fecha_inicio: attempt.fecha_inicio,
+                    fecha_fin: attempt.fecha_fin,
+                    created_at: attempt.created_at || attempt.createdAt,
+                    universidad: attempt.universidad ? {
+                        id_universidad: attempt.universidad.id_universidad,
+                        slug: attempt.universidad.slug,
+                        nombre: attempt.universidad.nombre,
+                    } : null,
+                })),
             });
         } catch (error) {
             return next(error);
@@ -515,10 +553,16 @@ class LearningController {
 
     static async getLearningAnalytics(req, res, next) {
         try {
-            const settings = await getAnalyticsSettings();
             const isTeacherUser = req.user.rol === 'docente';
+            if (isTeacherUser) {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Las estadísticas de estudiantes requieren una relación docente-grupo vigente.',
+                });
+            }
+            const settings = await getAnalyticsSettings();
             const where = { estado: 'finalizado' };
-            if (!isTeacherUser) where.id_usuario = req.user.id;
+            where.id_usuario = req.user.id;
 
             const attempts = await SimulacroAttempt.findAll({
                 where,
@@ -734,7 +778,21 @@ class LearningController {
                 limit: 100,
             });
 
-            return res.status(200).json({ success: true, data: questions });
+            const isTeacher = req.user.rol === 'docente' || req.user.rol === 'admin';
+            const activeAttempts = await SimulacroAttempt.findAll({
+                where: { id_usuario: req.user.id, estado: 'en_progreso' },
+                attributes: ['preguntas'],
+            });
+            const activeQuestionIds = new Set(activeAttempts.flatMap((attempt) => (attempt.preguntas || []).map(String)));
+
+            return res.status(200).json({
+                success: true,
+                data: questions.map((question) => (
+                    !isTeacher || activeQuestionIds.has(String(question.id_pregunta))
+                        ? toPublicQuestion(question)
+                        : question
+                )),
+            });
         } catch (error) {
             return next(error);
         }
@@ -865,6 +923,10 @@ class LearningController {
 
     static async listOpenAnswerReviews(req, res, next) {
         try {
+            return res.status(403).json({
+                success: false,
+                message: 'La revisión requiere autorización docente por grupo; la integración de membresías aún no está disponible.',
+            });
             const { estado = 'pendiente' } = req.query;
             const where = {};
             if (estado !== 'all') where.estado = estado;
@@ -927,6 +989,10 @@ class LearningController {
 
     static async reviewOpenAnswer(req, res, next) {
         try {
+            return res.status(403).json({
+                success: false,
+                message: 'La revisión requiere autorización docente por grupo; la integración de membresías aún no está disponible.',
+            });
             const { attemptId, questionId } = req.params;
             const puntaje = Number(req.body.puntaje);
             const feedback = req.body.feedback || null;
@@ -938,73 +1004,117 @@ class LearningController {
                 });
             }
 
-            const review = await OpenAnswerReview.findOne({
-                where: { id_intento: attemptId, id_pregunta: questionId },
-            });
-
-            if (!review) {
-                return res.status(404).json({
-                    success: false,
-                    message: 'Revision no encontrada',
+            const result = await sequelize.transaction(async (transaction) => {
+                const attempt = await SimulacroAttempt.findByPk(attemptId, {
+                    transaction,
+                    lock: transaction.LOCK.UPDATE,
                 });
-            }
+                if (!attempt) return { status: 404, body: { success: false, message: 'Intento no encontrado' } };
+                if (attempt.estado !== 'finalizado') return { status: 409, body: { success: false, message: 'El intento aún no fue finalizado' } };
 
-            const attempt = await SimulacroAttempt.findByPk(attemptId);
-            if (!attempt) {
-                return res.status(404).json({
-                    success: false,
-                    message: 'Intento no encontrado',
+                const review = await OpenAnswerReview.findOne({
+                    where: { id_intento: attemptId, id_pregunta: questionId },
+                    transaction,
+                    lock: transaction.LOCK.UPDATE,
                 });
-            }
-
-            await review.update({
-                puntaje: Math.round(puntaje),
-                feedback,
-                estado: 'revisado',
-                id_docente: req.user.id,
-                fecha_revision: new Date(),
-            });
-
-            const questions = await Question.findAll({
-                where: { id_pregunta: { [Op.in]: attempt.preguntas } },
-            });
-            const byId = new Map(questions.map((question) => [question.id_pregunta, question]));
-            const ordered = attempt.preguntas.map((id) => byId.get(id)).filter(Boolean);
-            const respuestas = Array.isArray(attempt.respuestas) ? attempt.respuestas : [];
-
-            let correctAnswers = 0;
-            ordered.forEach((question, index) => {
-                if (question.tipo === 'opcion_multiple' && respuestas[index] === question.respuesta_correcta) {
-                    correctAnswers += 1;
+                if (!review) return { status: 404, body: { success: false, message: 'Revision no encontrada' } };
+                if (review.estado !== 'pendiente') {
+                    return { status: 409, body: { success: false, message: 'La respuesta ya fue revisada; una recalificación requiere contrato de versión' } };
                 }
-            });
 
-            const reviews = await OpenAnswerReview.findAll({
-                where: { id_intento: attemptId, estado: 'revisado' },
-            });
-            const manualPoints = reviews.reduce((sum, item) => sum + Number(item.puntaje || 0), 0);
-            const manuallyCorrect = reviews.filter((item) => Number(item.puntaje || 0) >= 3).length;
-            const earnedPoints = correctAnswers * 5 + manualPoints;
-            const maximumPoints = Math.max(ordered.length * 5, 1);
-            const finalScore = Math.round((earnedPoints / maximumPoints) * 100);
+                const reviewedAt = new Date();
+                const roundedScore = Math.round(puntaje);
+                await review.update({
+                    puntaje: roundedScore,
+                    feedback,
+                    estado: 'revisado',
+                    id_docente: req.user.id,
+                    fecha_revision: reviewedAt,
+                    version: 1,
+                }, { transaction });
+                await OpenAnswerReviewAudit.create({
+                    id_revision: review.id_revision,
+                    version: 1,
+                    id_revisor: req.user.id,
+                    puntaje: roundedScore,
+                    feedback,
+                    fecha: reviewedAt,
+                }, { transaction });
 
-            await attempt.update({
-                puntaje: finalScore,
-                correctas: correctAnswers + manuallyCorrect,
-            });
+                const snapshot = Array.isArray(attempt.preguntas_snapshot) ? attempt.preguntas_snapshot : [];
+                let ordered = snapshot;
+                if (ordered.length === 0) {
+                    const questions = await Question.findAll({
+                        where: { id_pregunta: { [Op.in]: attempt.preguntas } },
+                        transaction,
+                    });
+                    const byId = new Map(questions.map((question) => [String(question.id_pregunta), createQuestionSnapshot(question)]));
+                    ordered = attempt.preguntas.map((id) => byId.get(String(id))).filter(Boolean);
+                }
+                const answers = Array.isArray(attempt.respuestas) ? attempt.respuestas : [];
+                const allReviews = await OpenAnswerReview.findAll({ where: { id_intento: attemptId }, transaction });
+                const graded = scoreReviewedAttempt(ordered, answers, allReviews);
+                const finalScore = graded.score;
+                const pendingCount = graded.pendingManualReviews;
+                const confirmed = graded.status === 'confirmed';
+                const correctAnswers = graded.correctAnswers;
+                const priorResult = attempt.resultado_confirmado || {};
+                const resultVersion = confirmed ? 1 : null;
+                const confirmedAt = confirmed ? reviewedAt.toISOString() : null;
+                const resultSnapshot = {
+                    ...priorResult,
+                    score: finalScore,
+                    totalQuestions: ordered.length,
+                    correctAnswers,
+                    pendingManualReviews: pendingCount,
+                    requiresManualReview: pendingCount > 0,
+                    status: confirmed ? 'confirmed' : 'pending_review',
+                    resultVersion,
+                    confirmedAt,
+                };
+                await attempt.update({
+                    puntaje: finalScore,
+                    correctas: correctAnswers,
+                    resultado_confirmado: resultSnapshot,
+                }, { transaction });
 
-            return res.status(200).json({
-                success: true,
-                data: {
-                    review,
-                    intento: {
-                        id_intento: attempt.id_intento,
-                        puntaje: finalScore,
-                        correctas: correctAnswers + manuallyCorrect,
-                        total_preguntas: attempt.total_preguntas,
+                if (confirmed) {
+                    const event = {
+                        eventId: randomUUID(),
+                        type: 'ResultadoConfirmado.v1',
+                        schemaVersion: 1,
+                        producer: 'evaluation',
+                        correlationId: randomUUID(),
+                        occurredAt: reviewedAt.toISOString(),
+                        data: { attemptId: String(attempt.id_intento), userId: String(attempt.id_usuario), resultVersion: 1, status: 'confirmed' },
+                    };
+                    await ExamOutbox.create({
+                        event_id: event.eventId,
+                        aggregate_id: String(attempt.id_intento),
+                        event_type: event.type,
+                        payload: event,
+                    }, { transaction });
+                }
+
+                return {
+                    status: 200,
+                    body: {
+                        success: true,
+                        data: {
+                            review,
+                            intento: {
+                                id_intento: attempt.id_intento,
+                                puntaje: finalScore,
+                                correctas: correctAnswers,
+                                total_preguntas: ordered.length,
+                                estado_resultado: resultSnapshot.status,
+                                resultVersion,
+                            },
+                        },
                     },
-                },
+                };
             });
+            return res.status(result.status).json(result.body);
         } catch (error) {
             return next(error);
         }
@@ -1036,6 +1146,12 @@ class LearningController {
                 order: [['createdAt', 'DESC']],
             });
 
+            const activeAttempts = await SimulacroAttempt.findAll({
+                where: { id_usuario: req.user.id, estado: 'en_progreso' },
+                attributes: ['preguntas'],
+            });
+            const activeQuestionIds = new Set(activeAttempts.flatMap((attempt) => (attempt.preguntas || []).map(String)));
+
             return res.status(200).json({
                 success: true,
                 data: savedQuestions.map((saved) => ({
@@ -1043,7 +1159,9 @@ class LearningController {
                     id_usuario: saved.id_usuario,
                     id_pregunta: saved.id_pregunta,
                     created_at: saved.created_at || saved.createdAt,
-                    pregunta: saved.pregunta,
+                    pregunta: saved.pregunta && activeQuestionIds.has(String(saved.id_pregunta))
+                        ? toPublicQuestion(saved.pregunta)
+                        : saved.pregunta,
                 })),
             });
         } catch (error) {

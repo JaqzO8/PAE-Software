@@ -1,0 +1,9 @@
+{
+  "eventId": "47e03a72-8ac6-4b2c-b272-c4e8ea0541c1",
+  "type": "ResultadoConfirmado.v1",
+  "schemaVersion": 1,
+  "producer": "evaluation",
+  "occurredAt": "2026-10-19T20:00:00.000Z",
+  "correlationId": "6c7547ec-68b3-43a8-b6c7-35b0dc6f9476",
+  "data": { "attemptId": "100", "userId": "200", "resultVersion": 1, "status": "confirmed" }
+}

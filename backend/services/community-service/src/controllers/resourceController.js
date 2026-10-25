@@ -1,8 +1,24 @@
 const { RecursoComunidad, Comunidad, MiembroComunidad } = require('../models');
 const fs = require('fs').promises;
 const path = require('path');
+const config = require('../config/env');
 
 class ResourceController {
+    static async download(req, res, next) {
+        try {
+            const resource = await RecursoComunidad.findOne({ where: { id_recurso: req.params.resourceId, comunidad_id: req.params.id } });
+            if (!resource) return res.status(404).json({ success: false, message: 'Recurso no encontrado' });
+            const filename = path.basename(resource.url_archivo);
+            if (!filename || filename === '.' || filename === '..') return res.status(404).json({ success: false, message: 'Recurso no encontrado' });
+            res.set('Cache-Control', 'private, no-store');
+            res.download(path.resolve(config.UPLOAD_PATH, filename), resource.nombre_archivo, (error) => {
+                if (error && !res.headersSent) {
+                    if (error.code === 'ENOENT') return res.status(404).json({ success: false, message: 'Archivo no encontrado' });
+                    next(error);
+                }
+            });
+        } catch (error) { next(error); }
+    }
     // POST /api/community/:id/resources - Subir PDF (solo docentes)
     static async upload(req, res, next) {
         try {
@@ -40,7 +56,7 @@ class ResourceController {
                 resource: {
                     id: resource.id_recurso,
                     nombre: resource.nombre_archivo,
-                    url: resource.url_archivo,
+                    url: `/api/community/${id}/resources/${resource.id_recurso}/download`,
                     descripcion: resource.descripcion,
                     fecha_subida: resource.fecha_subida,
                 },
@@ -70,7 +86,9 @@ class ResourceController {
                 order: [['fecha_subida', 'DESC']],
             });
 
-            res.status(200).json({ success: true, resources });
+            res.status(200).json({ success: true, resources: resources.map((resource) => ({
+                ...resource.get({ plain: true }), url_archivo: `/api/community/${id}/resources/${resource.id_recurso}/download`,
+            })) });
         } catch (error) {
             next(error);
         }
@@ -94,7 +112,7 @@ class ResourceController {
                 return res.status(403).json({ success: false, message: 'No autorizado' });
             }
 
-            const filePath = path.join(__dirname, '../../uploads', path.basename(resource.url_archivo));
+            const filePath = path.resolve(config.UPLOAD_PATH, path.basename(resource.url_archivo));
             await fs.unlink(filePath).catch(() => {});
             await resource.destroy();
 

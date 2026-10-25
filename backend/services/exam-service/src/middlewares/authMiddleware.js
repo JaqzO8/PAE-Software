@@ -1,6 +1,8 @@
 const jwt = require('jsonwebtoken');
 const config = require('../config/env');
 
+const localRevocationCache = new Set();
+
 const verifyToken = (req, res, next) => {
     const authHeader = req.headers.authorization;
     const token = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : null;
@@ -9,8 +11,16 @@ const verifyToken = (req, res, next) => {
         return res.status(401).json({ success: false, message: 'Token no proporcionado' });
     }
 
+    if (localRevocationCache.has(token)) {
+        return res.status(401).json({ success: false, message: 'Token revocado o sesión cerrada' });
+    }
+
     try {
-        req.user = jwt.verify(token, config.JWT_SECRET);
+        const decoded = jwt.verify(token, config.JWT_SECRET);
+        if (decoded.scope === 'mfa_challenge') {
+            return res.status(401).json({ success: false, message: 'Token de alcance restringido: se requiere verificación MFA' });
+        }
+        req.user = decoded;
         req.token = token;
         return next();
     } catch (error) {
@@ -32,4 +42,5 @@ const isTeacher = (req, res, next) => {
 module.exports = {
     verifyToken,
     isTeacher,
+    localRevocationCache,
 };
