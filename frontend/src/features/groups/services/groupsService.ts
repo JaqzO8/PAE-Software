@@ -56,6 +56,7 @@ export interface GroupAnalytics {
 }
 
 export interface GroupDetail extends Group {
+  ownerId?: string;
   description: string;
   createdAt: string;
   messages: GroupMessage[];
@@ -85,6 +86,7 @@ const mapCommunityToGroup = (community: Community): Group => ({
 });
 
 const mapCommunityToDetail = (community: Community): GroupDetail => ({
+  ownerId: community.profesor_id == null ? undefined : String(community.profesor_id),
   ...mapCommunityToGroup(community),
   description: community.descripcion || "Comunidad de aprendizaje colaborativo.",
   createdAt: formatDate(community.fecha_creacion),
@@ -135,8 +137,8 @@ export const getTeacherGroups = async (): Promise<Group[]> => {
   return communities.map(mapCommunityToGroup);
 };
 
-export const getStudentGroups = async (): Promise<Group[]> => {
-  const communities = await communityService.getMyCommunities();
+export const getStudentGroups = async (signal?: AbortSignal): Promise<Group[]> => {
+  const communities = await communityService.getMyCommunities(signal);
   return communities.map(mapCommunityToGroup);
 };
 

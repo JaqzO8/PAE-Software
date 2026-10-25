@@ -11,7 +11,7 @@ const FriendshipController = require('../controllers/friendshipController');
 const CommunityHubController = require('../controllers/communityHubController');
 
 const { verifyToken } = require('../middlewares/authMiddleware');
-const { verifyRole, verifyTeacherOfCommunity } = require('../middlewares/roleMiddleware');
+const { verifyRole, verifyTeacherOfCommunity, verifyMemberOfCommunity } = require('../middlewares/roleMiddleware');
 
 router.get('/health', (req, res) => {
     res.status(200).json({
@@ -38,9 +38,7 @@ router.get('/:id/performance', verifyToken, CommunityHubController.getPerformanc
 | Community core routes
 |--------------------------------------------------------------------------
 */
-router.use('/', communityRoutes);
-router.use('/', messageRoutes);
-router.use('/', resourceRoutes);
+
 
 /*
 |--------------------------------------------------------------------------
@@ -48,7 +46,7 @@ router.use('/', resourceRoutes);
 |--------------------------------------------------------------------------
 */
 router.post('/:id/challenges', verifyToken, verifyTeacherOfCommunity, ChallengeController.create);
-router.get('/:id/challenges', verifyToken, ChallengeController.list);
+router.get('/:id/challenges', verifyToken, verifyMemberOfCommunity, ChallengeController.list);
 router.put('/:id/challenges/:challengeId', verifyToken, verifyTeacherOfCommunity, ChallengeController.update);
 
 /*
@@ -69,5 +67,9 @@ router.post('/invitations/:id/reject', verifyToken, InvitationController.reject)
 router.post('/friends/request', verifyToken, FriendshipController.sendRequest);
 router.get('/friends', verifyToken, FriendshipController.list);
 router.get('/users/search', verifyToken, FriendshipController.searchUsers);
+
+router.use('/', communityRoutes);
+router.use('/', messageRoutes);
+router.use('/', resourceRoutes);
 
 module.exports = router;

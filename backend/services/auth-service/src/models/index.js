@@ -4,6 +4,7 @@ const Sesion = require('./Sesion');
 const HistorialSesion = require('./HistorialSesion');
 const UserPreference = require('./UserPreference');
 const SupportTicket = require('./SupportTicket');
+const SolicitudDocente = require('./SolicitudDocente');
 
 // Función para inicializar roles por defecto
 const initializeRoles = async () => {
@@ -33,5 +34,6 @@ module.exports = {
     HistorialSesion,
     UserPreference,
     SupportTicket,
+    SolicitudDocente,
     initializeRoles,
 };

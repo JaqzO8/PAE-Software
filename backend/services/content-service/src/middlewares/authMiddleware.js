@@ -9,7 +9,10 @@ const extractToken = (authHeader) => {
     return authHeader.substring(7);
 };
 
-const verifyToken = (req, res, next) => {
+// Cache en memoria para tokens revocados localmente con TTL corto (RIC-11)
+const localRevocationCache = new Set();
+
+const verifyToken = async (req, res, next) => {
     const token = extractToken(req.headers.authorization);
 
     if (!token) {
@@ -19,8 +22,24 @@ const verifyToken = (req, res, next) => {
         });
     }
 
+    if (localRevocationCache.has(token)) {
+        return res.status(401).json({
+            success: false,
+            message: 'Token revocado o sesión cerrada',
+        });
+    }
+
     try {
         const decoded = jwt.verify(token, config.JWT_SECRET);
+
+        // Tokens de alcance restringido no tienen acceso a recursos de contenido
+        if (decoded.scope === 'mfa_challenge') {
+            return res.status(401).json({
+                success: false,
+                message: 'Token de alcance restringido: se requiere verificación MFA',
+            });
+        }
+
         req.user = decoded;
         req.token = token;
         return next();
@@ -60,4 +79,5 @@ module.exports = {
     verifyToken,
     isAuthenticated,
     isTeacher,
+    localRevocationCache,
 };

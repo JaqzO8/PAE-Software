@@ -1,9 +1,9 @@
 const jwt = require('jsonwebtoken');
 const config = require('../config/env');
+const { redis } = require('../config/redis');
 
 /**
- * Middleware para verificar JWT token
- * Reutiliza la misma lógica que auth-service
+ * Middleware para verificar JWT token y validar revocación inmediata en Redis (RIC-04, RIC-11, RIC-AC-04)
  */
 const verifyToken = async (req, res, next) => {
     try {
@@ -19,8 +19,29 @@ const verifyToken = async (req, res, next) => {
         const token = authHeader.substring(7);
 
         try {
+            // Comprobar si el token fue revocado en Redis blacklist
+            try {
+                const isRevoked = await redis.get(`blacklist:${token}`);
+                if (isRevoked) {
+                    return res.status(401).json({
+                        success: false,
+                        message: 'Token revocado o sesión finalizada',
+                    });
+                }
+            } catch {
+                // Redis degradado; continuar con validación criptográfica
+            }
+
             const decoded = jwt.verify(token, config.JWT_SECRET);
-            
+
+            // Tokens de desafío MFA no tienen acceso a rutas de la comunidad
+            if (decoded.scope === 'mfa_challenge') {
+                return res.status(401).json({
+                    success: false,
+                    message: 'Token de alcance restringido: se requiere verificación MFA previa',
+                });
+            }
+
             // Adjuntar datos del usuario a la request
             req.user = decoded;
             req.token = token;

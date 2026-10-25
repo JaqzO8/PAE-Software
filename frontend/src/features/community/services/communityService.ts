@@ -1,6 +1,7 @@
 import { api } from "../../../services/api";
 
 export interface Community {
+  profesor_id?: number | string;
   id: number | string;
   nombre: string;
   descripcion?: string | null;
@@ -164,8 +165,8 @@ export const communityService = {
     return response.data.community as Community;
   },
 
-  async getMyCommunities() {
-    const response = await api.get("/community/my-communities");
+  async getMyCommunities(signal?: AbortSignal) {
+    const response = await api.get("/community/my-communities", { signal });
     return response.data.communities as Community[];
   },
 

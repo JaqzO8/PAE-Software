@@ -1,4 +1,5 @@
 const { Amistad } = require('../models');
+const { Op } = require('sequelize');
 const axios = require('axios');
 const config = require('../config/env');
 
@@ -67,8 +68,8 @@ class FriendshipController {
 
             // Llamar a auth-service para buscar usuarios
             const response = await axios.get(
-                `${config.AUTH_SERVICE_URL}/api/auth/users/search?query=${query}`,
-                { headers: { Authorization: `Bearer ${req.token}` } }
+                `${config.AUTH_SERVICE_URL}/api/auth/users/search`,
+                { params: { query }, headers: { Authorization: `Bearer ${req.token}` }, timeout: 2500 }
             );
 
             res.status(200).json({ success: true, users: response.data.users });

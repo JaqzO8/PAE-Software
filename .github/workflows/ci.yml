@@ -36,7 +36,39 @@ jobs:
       - run: npm ci --prefix backend/services/quality-service
       - run: npm ci --prefix backend/services/auth-service
       - run: npm ci --prefix backend/services/community-service
+      - run: npm ci --prefix backend/services/exam-service
+      - run: npm ci --prefix backend/services/learning-service
       - run: npm test --prefix backend/services/content-service -- --runInBand
       - run: npm test --prefix backend/services/quality-service
       - run: npm run test:exam
       - run: node scripts/verify-config.mjs
+      - run: npm run check:architecture
+      - run: npm run test:architecture
+      - run: npm run test:learning
+
+  architecture-integration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: pae_test
+          POSTGRES_PASSWORD: ephemeral-ci-fixture-only
+          POSTGRES_DB: postgres
+        ports:
+          - 5435:5432
+        options: >-
+          --label com.docker.compose.project=pruebas_pae
+          --health-cmd "pg_isready -U pae_test -d postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm ci
+      - run: npm ci --prefix backend/services/community-service
+      - run: npm ci --prefix backend/services/learning-service
+      - run: npm run test:docker
+        env:
+          PAE_TEST_DB_CONTAINER: ${{ job.services.postgres.id }}

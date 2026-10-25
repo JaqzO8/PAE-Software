@@ -34,6 +34,7 @@ const config = {
     MESSAGE_RATE_LIMIT_MAX: parseNumber(process.env.COMMUNITY_MESSAGE_RATE_LIMIT_MAX, 12),
     MESSAGE_RATE_LIMIT_WINDOW_SECONDS: parseNumber(process.env.COMMUNITY_MESSAGE_RATE_LIMIT_WINDOW_SECONDS, 10),
     USER_CACHE_TTL_SECONDS: parseNumber(process.env.COMMUNITY_USER_CACHE_TTL_SECONDS, 300),
+    INVITATION_TTL_HOURS: parseNumber(process.env.COMMUNITY_INVITATION_TTL_HOURS, 168),
 
     // Observability and performance
     LOG_SQL: process.env.LOG_SQL === 'true',
@@ -44,6 +45,9 @@ const config = {
 };
 
 const weakJwtSecrets = ['default_jwt_secret', 'dev_secret_no_importa', 'change-me'];
+if (config.INVITATION_TTL_HOURS <= 0 || config.INVITATION_TTL_HOURS > 720) {
+    throw new Error('COMMUNITY_INVITATION_TTL_HOURS debe ser mayor que 0 y como máximo 720');
+}
 
 if (config.NODE_ENV === 'production' && (weakJwtSecrets.includes(config.JWT_SECRET) || config.JWT_SECRET.length < 32)) {
     throw new Error('JWT_SECRET seguro es requerido en produccion');

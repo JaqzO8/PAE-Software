@@ -6,6 +6,6 @@ const { verifyMemberOfCommunity } = require('../middlewares/roleMiddleware');
 
 router.get('/:id/messages', verifyToken, verifyMemberOfCommunity, MessageController.getMessages);
 router.post('/:id/messages', verifyToken, verifyMemberOfCommunity, MessageController.sendMessage);
-router.delete('/:id/messages/:messageId', verifyToken, MessageController.deleteMessage);
+router.delete('/:id/messages/:messageId', verifyToken, verifyMemberOfCommunity, MessageController.deleteMessage);
 
 module.exports = router;
