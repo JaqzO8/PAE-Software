@@ -1,3 +1,5 @@
+const path = require('path');
+const fs = require('fs');
 require('dotenv').config();
 
 const parseNumber = (value, fallback) => {
@@ -24,7 +26,7 @@ const config = {
     JWT_SECRET: process.env.JWT_SECRET || '',
     
     // File Upload
-    UPLOAD_PATH: process.env.UPLOAD_PATH || '/app/uploads',
+    UPLOAD_PATH: process.env.UPLOAD_PATH || (fs.existsSync('/app') ? '/app/uploads' : path.join(__dirname, '../../uploads')),
     MAX_FILE_SIZE: parseNumber(process.env.MAX_FILE_SIZE, 52428800),
     ALLOWED_FILE_TYPES: {
         pdf: ['application/pdf'],

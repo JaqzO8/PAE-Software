@@ -1,7 +1,7 @@
 const { fail, positiveId, requireActive, requireOwner, requireNotExpelled, invitationExpiresAt } = require('../domain/communityPolicy');
 
-// Ports: unitOfWork(callback) supplies a transactional repository; clock.now() returns a Date.
-function createCommunityUseCases({ unitOfWork, clock, invitationTtlMs, findStudent }) {
+// Ports: unitOfWork(callback) supplies a transactional repository; clock.now() returns a Date; hash(str) returns a digest.
+function createCommunityUseCases({ unitOfWork, clock, invitationTtlMs, findStudent, hash = (str) => Buffer.from(str).toString('hex') }) {
     if (!Number.isFinite(invitationTtlMs) || invitationTtlMs <= 0) throw new Error('Invalid invitation TTL');
     const inCommunity = (id, work) => unitOfWork(async (repo) => {
         const community = await repo.lockCommunity(positiveId(id));
@@ -47,15 +47,15 @@ function createCommunityUseCases({ unitOfWork, clock, invitationTtlMs, findStude
             requireNotExpelled(member);
             if (!member?.activo) fail('MEMBERSHIP_REQUIRED', 'No eres miembro de esta comunidad', 403);
             if (clientId != null && (typeof clientId !== 'string' || !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(clientId))) fail('INVALID_REQUEST_ID', 'Identificador de mensaje inválido');
-            const hash = createHash('sha256').update(content.trim()).digest('hex');
+            const requestHash = hash(content.trim());
             if (clientId) {
                 const previous = await repo.findMessageRequest(community.id_comunidad, positiveId(actor.id), clientId);
                 if (previous) {
-                    if (previous.request_hash !== hash) fail('REQUEST_CONFLICT', 'El identificador ya corresponde a otro mensaje', 409);
+                    if (previous.request_hash !== requestHash) fail('REQUEST_CONFLICT', 'El identificador ya corresponde a otro mensaje', 409);
                     return { ...previous, replayed: true };
                 }
             }
-            return repo.createMessage({ comunidad_id: community.id_comunidad, usuario_id: positiveId(actor.id), contenido: content.trim(), fecha_envio: clock.now(), client_id: clientId || null, request_hash: hash });
+            return repo.createMessage({ comunidad_id: community.id_comunidad, usuario_id: positiveId(actor.id), contenido: content.trim(), fecha_envio: clock.now(), client_id: clientId || null, request_hash: requestHash });
         }),
         changeMessage: ({ communityId, messageId, actor, content, remove, version, reason }) => inCommunity(communityId, async (repo, community) => {
             const member = await repo.findMember(community.id_comunidad, positiveId(actor.id));
