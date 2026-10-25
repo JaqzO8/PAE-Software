@@ -11,9 +11,12 @@ function createUnitOfWork({ sequelize, Comunidad, MiembroComunidad, InvitacionCo
             lockCommunity: async (id) => plain(await Comunidad.findByPk(id, { transaction, lock: transaction.LOCK.UPDATE })),
             createCommunity: async (values) => plain(await Comunidad.create(values, { transaction })),
             createMessage: async (values) => plain(await MensajeCanal.create(values, { transaction })),
+            findMessage: async (communityId, id) => plain(await MensajeCanal.findOne({ where: { comunidad_id: communityId, id_mensaje: id }, transaction })),
+            findMessageRequest: async (communityId, userId, clientId) => plain(await MensajeCanal.findOne({ where: { comunidad_id: communityId, usuario_id: userId, client_id: clientId }, transaction })),
+            saveMessage: (record, values) => save(MensajeCanal, record, 'id_mensaje', values),
             findMember: async (communityId, userId) => plain(await MiembroComunidad.findOne({ where: { comunidad_id: communityId, usuario_id: userId }, transaction })),
             findInvitation: async (id) => plain(await InvitacionComunidad.findByPk(id, { transaction })),
-            findInvitationFor: async (communityId, studentId) => plain(await InvitacionComunidad.findOne({ where: { comunidad_id: communityId, estudiante_id: studentId }, transaction })),
+            findInvitationFor: async (communityId, studentId) => plain(await InvitacionComunidad.findOne({ where: { comunidad_id: communityId, estudiante_id: studentId }, order: [['id_invitacion', 'DESC']], transaction })),
             saveMember: (record, values) => save(MiembroComunidad, record, 'id_miembro', values),
             saveInvitation: (record, values) => save(InvitacionComunidad, record, 'id_invitacion', values),
             closeCommunity: async (id, now) => {

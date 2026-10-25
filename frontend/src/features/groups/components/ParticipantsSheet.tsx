@@ -21,7 +21,7 @@ interface ParticipantsSheetProps {
   onOpenChange: (open: boolean) => void;
   participants: GroupParticipant[];
   groupName: string;
-  onLeave: () => void;
+  onLeave?: () => void;
 }
 
 export function ParticipantsSheet({
@@ -79,14 +79,14 @@ export function ParticipantsSheet({
 
         {/* Botón de Salir (zona peligrosa) */}
         <div className="p-6 border-t border-neutral-200 bg-neutral-50/50">
-          <Button
+          {onLeave && <Button
             variant="destructive"
             className={styles.leaveButton}
             onClick={onLeave}
           >
             <LogOut className="h-4 w-4 mr-2" />
             Salir del Grupo
-          </Button>
+          </Button>}
         </div>
       </SheetContent>
     </Sheet>

@@ -19,3 +19,16 @@ async function findStudent(userId, accessToken) {
     }
 }
 module.exports = { findStudent };
+
+async function findUser(userId, accessToken) {
+    try {
+        const response = await axios.get(`${config.AUTH_SERVICE_URL}/api/auth/user/${userId}`, { headers: { Authorization: `Bearer ${accessToken}` }, timeout: 2500 });
+        if (!response.data.user || String(response.data.user.id) !== String(userId)) fail('USER_NOT_FOUND', 'Usuario no encontrado', 404);
+        return response.data.user;
+    } catch (error) {
+        if (error.code === 'USER_NOT_FOUND' || error.response?.status === 404) fail('USER_NOT_FOUND', 'Usuario no encontrado', 404);
+        if ([401, 403].includes(error.response?.status)) fail('SESSION_INVALID', 'La sesión no está autorizada', 401);
+        fail('IDENTITY_UNAVAILABLE', 'No se pudo verificar al usuario', 503);
+    }
+}
+module.exports.findUser = findUser;

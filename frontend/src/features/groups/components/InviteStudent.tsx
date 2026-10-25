@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Button, Input } from "../../../desingSystem/primitives";
 import { invitationsService, invitationError, type PublicStudent } from "../../community/services/invitationsService";
 
-export function InviteStudent({ communityId }: { communityId: string }) {
+export function InviteStudent({ communityId, onSent }: { communityId: string; onSent?: () => void }) {
   const [query, setQuery] = useState("");
   const [students, setStudents] = useState<PublicStudent[]>([]);
   const [busy, setBusy] = useState(false);
@@ -25,6 +25,7 @@ export function InviteStudent({ communityId }: { communityId: string }) {
     setBusy(true); setError(""); setNotice("");
     try {
       await invitationsService.send(communityId, student.id);
+      onSent?.();
       setNotice(`Invitación enviada a ${student.nombres} ${student.apellidos}.`);
       setStudents(current => current.filter(item => item.id !== student.id));
     } catch (cause) { setError(invitationError(cause)); }
