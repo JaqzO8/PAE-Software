@@ -20,11 +20,14 @@ import {
     trackLessonTime,
     type Lesson
 } from "../../../features/lessons/services/lessonService";
+import { getOfflineLesson, saveOfflineLesson } from "../../../features/lessons/services/offlineLessonStore";
+import { useAuth } from "../../../context/AuthContext";
 
 export default function StudentLessonDetail() {
     const { lessonId } = useParams<{ lessonId: string }>();
     const navigate = useNavigate();
     const { toast } = useToast();
+    const { user } = useAuth();
     const [lesson, setLesson] = useState<Lesson | null>(null);
     const [summary, setSummary] = useState<string>("");
     const [solution, setSolution] = useState<any[]>([]);
@@ -75,12 +78,28 @@ export default function StudentLessonDetail() {
         setIsLoading(true);
         try {
             const data = await getLessonById(lessonId);
+            if (user?.id) {
+                const version = String((data as Lesson & { updatedAt?: string; fecha_actualizacion?: string }).updatedAt
+                    || (data as Lesson & { fecha_actualizacion?: string }).fecha_actualizacion
+                    || data.id_leccion);
+                saveOfflineLesson(String(user.id), lessonId, data, version);
+            }
             setLesson(data);
             const tracked = data.progress?.tiempo_segundos || 0;
             setBaseTrackedSeconds(tracked);
             setStartedAt(Date.now());
             setIsTracking(Boolean(data.progress && !data.progress.completada));
         } catch (error: any) {
+            const cached = user?.id
+                ? getOfflineLesson<Lesson>(String(user.id), lessonId)
+                : null;
+            if (cached) {
+                setLesson(cached);
+                setIsTracking(Boolean(cached.progress && !cached.progress.completada));
+                setIsLoading(false);
+                toast({ title: "Modo sin conexión", description: "Se mostró la última versión disponible." });
+                return;
+            }
             toast({
                 variant: "destructive",
                 title: "Error",

@@ -11,6 +11,10 @@
     "node": ">=24 <25"
   },
   "scripts": {
+    "test": "npm run test:content:core && npm run test:learning && npm run test:ops && npm run test:frontend && node --test tests/architecture/eventContracts.test.cjs",
+    "test:content:core": "npm --prefix backend/services/content-service exec jest src/tests/unit src/tests/integration --runInBand",
+    "test:ops": "node --test tests/m8/backupRestore.test.cjs tests/m8/accessibilityAudit.test.cjs",
+    "test:frontend": "npm run build --prefix frontend",
     "setup:local": "node scripts/setup-local.mjs",
     "check:safety": "node scripts/check-repository-safety.mjs",
     "test:exam": "jest backend/services/exam-service/src/tests --runInBand --ci",
@@ -19,6 +23,7 @@
     "test:architecture": "node --test tests/architecture/*.test.cjs",
     "test:learning": "npm test --prefix backend/services/learning-service",
     "test:docker": "node scripts/test-docker-architecture.mjs",
+    "test:content": "npm test --prefix backend/services/content-service -- --runInBand",
     "test:auth": "node --test tests/auth/roleSecurity.test.cjs tests/auth/mfaFlow.test.cjs tests/auth/passwordResetRace.test.cjs tests/auth/publicUsersDto.test.cjs tests/auth/sessionRevocationCrossService.test.cjs",
     "test:m8": "node --test tests/m8/platformPreferences.test.cjs tests/m8/notificationTransport.test.cjs tests/m8/backupRestore.test.cjs tests/m8/accessibilityAudit.test.cjs tests/m8/infrastructureSecurity.test.cjs"
   }

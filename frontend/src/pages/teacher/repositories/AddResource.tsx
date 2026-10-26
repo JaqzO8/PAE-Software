@@ -21,6 +21,8 @@ const resourceSchema = z.object({
     tipo_recurso: z.enum(["pdf", "video", "audio", "imagen", "enlace", "otro"]),
     url_externa: z.string().url("URL inválida").optional().or(z.literal("")),
     orden: z.number().min(0).optional(),
+    fuente_url: z.string().url("URL de fuente inválida").optional().or(z.literal("")),
+    licencia: z.string().max(160, "Máximo 160 caracteres").optional(),
 });
 
 type ResourceFormData = z.infer<typeof resourceSchema>;
@@ -40,6 +42,8 @@ export default function AddResource() {
             tipo_recurso: "pdf",
             url_externa: "",
             orden: 0,
+            fuente_url: "",
+            licencia: "",
         },
     });
 
@@ -66,6 +70,8 @@ export default function AddResource() {
             if (data.descripcion) formData.append("descripcion", data.descripcion);
             formData.append("tipo_recurso", data.tipo_recurso);
             if (data.url_externa) formData.append("url_externa", data.url_externa);
+            if (data.fuente_url) formData.append("fuente_url", data.fuente_url);
+            if (data.licencia) formData.append("licencia", data.licencia);
             if (data.orden !== undefined) formData.append("orden", data.orden.toString());
             if (file) formData.append("file", file);
 
@@ -120,6 +126,32 @@ export default function AddResource() {
                                     </FormItem>
                                 )}
                             />
+
+                            <div className="grid gap-4 md:grid-cols-2">
+                                <FormField
+                                    control={form.control}
+                                    name="fuente_url"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Fuente / referencia</FormLabel>
+                                            <FormControl><Input placeholder="https://fuente-oficial.example" {...field} /></FormControl>
+                                            <FormDescription>Registra el origen para revisión editorial.</FormDescription>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                                <FormField
+                                    control={form.control}
+                                    name="licencia"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Licencia / autorización</FormLabel>
+                                            <FormControl><Input placeholder="CC BY 4.0 o autorización propia" {...field} /></FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                            </div>
 
                             <FormField
                                 control={form.control}

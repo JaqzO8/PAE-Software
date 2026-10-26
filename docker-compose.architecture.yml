@@ -28,6 +28,7 @@ services:
     environment:
       LEARNING_PORT: 3006
       LEARNING_HOST: 0.0.0.0
+      JWT_SECRET: ${JWT_SECRET:?JWT secret required}
       PGHOST: learning-db
       PGPORT: 5432
       PGDATABASE: learning_pilot

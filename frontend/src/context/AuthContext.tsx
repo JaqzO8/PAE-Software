@@ -3,6 +3,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '../hooks/useToast';
 import * as authService from '../features/auth/services/authServices';
+import { clearOfflineLessons } from '../features/lessons/services/offlineLessonStore';
 
 // ========================================
 // INTERFACES
@@ -183,6 +184,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.error('Error al cerrar sesión en servidor:', error);
     } finally {
       // Limpiar siempre localmente, aunque falle el servidor
+      if (user?.id) clearOfflineLessons(String(user.id));
       clearAuthData();
 
       toast({
@@ -192,7 +194,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       navigate('/', { replace: true });
     }
-  }, [navigate, toast]);
+  }, [navigate, toast, user?.id]);
 
   // ========================================
   // ACTUALIZAR USUARIO

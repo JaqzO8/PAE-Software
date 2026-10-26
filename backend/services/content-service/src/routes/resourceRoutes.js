@@ -22,14 +22,23 @@ router.post(
     ResourceController.create
 );
 
+router.post(
+    '/:id/publish',
+    verifyToken,
+    isTeacher,
+    ResourceController.publish
+);
+router.post('/:id/editorial-review', verifyToken, isTeacher, ResourceController.editorialReview);
+
 /**
  * GET /api/content/resources/:id/file
  * Descargar archivo local autenticado
  */
 router.get(
     '/:id/file',
-    verifyToken,
-    isAuthenticated,
+    (req, res, next) => req.query.access_token
+        ? ResourceController.temporaryAccess(req, res, next)
+        : verifyToken(req, res, () => isAuthenticated(req, res, next)),
     ResourceController.streamFile
 );
 
