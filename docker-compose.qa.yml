@@ -1,0 +1,71 @@
+name: pae_qa
+x-runtime: &runtime
+  NODE_ENV: development
+  NODE_V8_COVERAGE: /coverage
+  NODE_OPTIONS: --require /qa/coverage.cjs
+  JWT_SECRET: ${QA_JWT_SECRET:?Use npm run qa:up}
+  DB_HOST: postgres
+  DB_PORT: 5432
+  DB_USER: pae_qa
+  DB_PASSWORD: ${QA_DB_PASSWORD:?Use npm run qa:up}
+  REDIS_URL: redis://redis:6379
+  AUTH_SERVICE_URL: http://auth-service:3001
+  FRONTEND_URL: http://localhost:15173
+  LOG_SQL: 'false'
+  DB_POOL_MAX: 8
+  DB_POOL_ACQUIRE_MS: 3000
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: pae_qa
+      POSTGRES_PASSWORD: ${QA_DB_PASSWORD}
+      POSTGRES_DB: postgres
+    ports: ['127.0.0.1:15435:5432']
+    volumes: ['./tests/qa/init.sql:/docker-entrypoint-initdb.d/01-qa.sql:ro', 'qa-db:/var/lib/postgresql/data']
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U pae_qa -d postgres']
+      interval: 2s
+      timeout: 3s
+      retries: 20
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 2s
+      timeout: 3s
+      retries: 20
+  auth-service:
+    build: ./backend/services/auth-service
+    volumes: ['./tests/qa/coverage.cjs:/qa/coverage.cjs:ro', './coverage/qa/auth:/coverage']
+    environment: { <<: *runtime, PORT: 3001, DB_NAME: qa_auth }
+    depends_on: { postgres: { condition: service_healthy }, redis: { condition: service_healthy } }
+  community-service:
+    build: ./backend/services/community-service
+    volumes: ['./tests/qa/coverage.cjs:/qa/coverage.cjs:ro', './coverage/qa/community:/coverage']
+    environment: { <<: *runtime, PORT: 3002, DB_NAME: qa_community, UPLOAD_PATH: /app/uploads }
+    depends_on: { postgres: { condition: service_healthy }, redis: { condition: service_healthy } }
+  exam-service:
+    build: ./backend/services/exam-service
+    volumes: ['./tests/qa/coverage.cjs:/qa/coverage.cjs:ro', './coverage/qa/exam:/coverage']
+    environment: { <<: *runtime, PORT: 3004, DB_NAME: qa_exam }
+    depends_on: { postgres: { condition: service_healthy } }
+  content-service:
+    build: ./backend/services/content-service
+    volumes: ['./tests/qa/coverage.cjs:/qa/coverage.cjs:ro', './coverage/qa/content:/coverage']
+    environment: { <<: *runtime, PORT: 3003, DB_NAME: qa_content, UPLOAD_PATH: /app/uploads }
+    depends_on: { postgres: { condition: service_healthy } }
+  quality-service:
+    build: ./backend/services/quality-service
+    volumes: ['./tests/qa/coverage.cjs:/qa/coverage.cjs:ro', './coverage/qa/quality:/coverage']
+    environment: { <<: *runtime, PORT: 3005 }
+  nginx-gateway:
+    build: ./backend/nginx
+    ports: ['127.0.0.1:13000:3000']
+    depends_on: [auth-service, community-service, exam-service, content-service, quality-service]
+  frontend:
+    build: ./frontend
+    ports: ['127.0.0.1:15173:5173']
+    depends_on: [nginx-gateway]
+volumes:
+  qa-db:
