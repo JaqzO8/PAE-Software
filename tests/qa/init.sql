@@ -1,0 +1,4 @@
+CREATE DATABASE qa_auth;
+CREATE DATABASE qa_community;
+CREATE DATABASE qa_exam;
+CREATE DATABASE qa_content;

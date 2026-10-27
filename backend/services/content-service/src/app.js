@@ -49,7 +49,7 @@ function createApp() {
 
     // Middleware para servir archivos estáticos con logs
     app.use('/uploads', (req, res, next) => {
-        console.log('📥 Solicitud de archivo:', req.url);
+        console.log(JSON.stringify({ event: 'file_request', path: req.path.slice(0, 200) }));
         next();
     }, express.static(config.UPLOAD_PATH, {
         setHeaders: (res, filePath) => {
@@ -66,7 +66,7 @@ function createApp() {
 
     // Middleware para manejar 404 en uploads
     app.use('/uploads', (req, res) => {
-        console.error('❌ Archivo no encontrado:', req.url);
+        console.error(JSON.stringify({ event: 'file_not_found', path: req.path.slice(0, 200) }));
         res.status(404).json({
             success: false,
             message: 'Archivo no encontrado',

@@ -5,7 +5,7 @@ async function searchPublicUsers(req, res, next) {
     try {
         const query = typeof req.query.query === 'string' ? req.query.query.trim() : '';
         if (query.length < 2 || query.length > 100) return res.status(400).json({ success: false, message: 'Busca entre 2 y 100 caracteres' });
-        const term = `%${query.replace(/[\\%_]/g, '\\$&')}%`;
+        const term = `%${query.replace(/[\\%_]/g, String.raw`\$&`)}%`;
         const users = await Usuario.findAll({
             where: { activo: true, [Op.or]: [
                 { nombres: { [Op.iLike]: term } }, { apellidos: { [Op.iLike]: term } },

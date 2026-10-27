@@ -41,11 +41,11 @@ class TokenService {
             // Verificar si el token está en la blacklist
             const blacklisted = await isBlacklisted(token);
             if (blacklisted) {
-                throw new Error('Token revocado');
+                return { valid: false, error: 'Token revocado' };
             }
 
             // Verificar el token
-            const decoded = jwt.verify(token, config.JWT_SECRET);
+            const decoded = jwt.verify(token, config.JWT_SECRET, { algorithms: ['HS256'] });
 
             // Tokens de desafío MFA no tienen acceso a rutas normales
             if (!allowChallenge && decoded.scope === 'mfa_challenge') {
@@ -63,7 +63,7 @@ class TokenService {
             if (error.name === 'JsonWebTokenError') {
                 return { valid: false, error: 'Token inválido' };
             }
-            return { valid: false, error: error.message };
+            return { valid: false, error: 'No se pudo verificar la sesión', status: error.status || 503 };
         }
     }
 

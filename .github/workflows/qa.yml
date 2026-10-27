@@ -1,0 +1,61 @@
+name: QA integral PAE
+on:
+  push:
+    branches: [develop, main]
+  pull_request:
+    branches: [develop, main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  qa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      QA_BROWSER_CHANNEL: chromium
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm ci --ignore-scripts
+      - name: Install service dependencies
+        run: |
+          for service in auth community content exam learning quality; do
+            npm ci --ignore-scripts --prefix backend/services/$service-service
+          done
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:coverage
+      - run: npm run qa:up
+      - name: Wait for API readiness
+        run: |
+          for attempt in $(seq 1 40); do
+            if curl --fail --silent http://127.0.0.1:13000/api/auth/health && curl --fail --silent http://127.0.0.1:13000/api/community/health; then exit 0; fi
+            sleep 2
+          done
+          exit 1
+      - run: npm run test:qa
+      - run: npm run test:qa:security
+      - run: npm run qa:coverage
+        if: always()
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: qa-evidence
+          path: |
+            test-results/qa/
+            coverage/unit/
+            coverage/qa/
+            docs/estabilizacion/RESULTADOS_PRUEBAS.md
+      - name: SonarQube analysis with coverage
+        if: success() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        uses: SonarSource/sonarqube-scan-action@d209202bc7d53ff1cc128f7f907dac145c9d6ae9 # v8
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN || secrets.PAESOFTK }}
+        with:
+          args: >-
+            -Dsonar.qualitygate.wait=true
+      - run: npm run qa:stop
+        if: always()

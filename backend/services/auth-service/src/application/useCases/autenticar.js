@@ -1,6 +1,12 @@
 // backend/services/auth-service/src/application/useCases/autenticar.js
 const { ESTADOS_AUTENTICACION, MFA_CONFIG } = require('../../domain/politicaSesion');
 
+async function checkAttemptLimit(rateLimiter, email) {
+    if (rateLimiter && await rateLimiter.getAttempts(email) >= 5) {
+        throw Object.assign(new Error('Demasiados intentos fallidos. Intenta más tarde.'), { statusCode: 429 });
+    }
+}
+
 /**
  * Caso de Uso: Autenticar usuario con correo y contraseña (RIC-01, RIC-04, RIC-06, RIC-AC-02)
  * - Respuestas neutras ante credenciales incorrectas para evitar enumeración (RIC-01)
@@ -26,14 +32,7 @@ async function autenticar({
     }
 
     // Verificar límite de intentos
-    if (rateLimiter) {
-        const attempts = await rateLimiter.getAttempts(normalizedEmail);
-        if (attempts >= 5) {
-            const error = new Error('Demasiados intentos fallidos. Intenta más tarde.');
-            error.statusCode = 429;
-            throw error;
-        }
-    }
+    await checkAttemptLimit(rateLimiter, normalizedEmail);
 
     const user = await userRepository.findByEmail(normalizedEmail);
 
