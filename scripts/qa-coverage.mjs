@@ -6,8 +6,9 @@ import { compose } from '../tests/qa/harness.mjs';
 const output = path.resolve('coverage/qa-v8');
 await mkdir(output, { recursive: true });
 for (const service of ['auth', 'community', 'exam', 'content', 'quality']) {
-    compose('exec', '-T', `${service}-service`, 'node', '-e', `
+    compose('exec', '-T', `${service}-service`, 'env', '-u', 'NODE_V8_COVERAGE', 'node', '-e', `
         const fs = require('node:fs');
+        const before = new Set(fs.readdirSync('/coverage'));
         let signalled = 0;
         for (const pid of fs.readdirSync('/proc').filter(value => /^\\d+$/.test(value))) {
             try {
@@ -18,15 +19,24 @@ for (const service of ['auth', 'community', 'exam', 'content', 'quality']) {
             } catch (error) { if (error.code !== 'ENOENT') throw error; }
         }
         if (signalled !== 1) throw new Error('Expected exactly one application process');
+        (async () => {
+            for (let attempt = 0; attempt < 50; attempt++) {
+                const files = fs.readdirSync('/coverage').filter(name => name.endsWith('.json'));
+                if (files.some(name => !before.has(name))) {
+                    // V8 writes mode 0600 as the container user. Only QA coverage is shared.
+                    for (const file of files) {
+                        JSON.parse(fs.readFileSync('/coverage/' + file, 'utf8'));
+                        fs.chmodSync('/coverage/' + file, 0o644);
+                    }
+                    return;
+                }
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+            throw new Error('Application did not flush fresh coverage');
+        })().catch(error => { console.error(error.message); process.exitCode = 1; });
     `);
     const rawDir = path.resolve(`coverage/qa/${service}`);
-    // The signal writes synchronously inside the process; bounded retry observes completion.
-    let files = [];
-    for (let attempt = 0; attempt < 20; attempt++) {
-        files = (await readdir(rawDir)).filter(name => name.endsWith('.json'));
-        if (files.length) break;
-        await new Promise(resolve => setTimeout(resolve, 100));
-    }
+    const files = (await readdir(rawDir)).filter(name => name.endsWith('.json'));
     if (!files.length) throw new Error(`No coverage produced for ${service}`);
     for (const file of files) {
         const data = JSON.parse(await readFile(path.join(rawDir, file), 'utf8'));
