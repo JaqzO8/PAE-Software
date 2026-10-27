@@ -11,10 +11,11 @@ Revisión: 26 de octubre de 2026. Las ejecuciones conservan fecha UTC en test-re
 | Auth | 24 pruebas aprobadas |
 | Plataforma M8 | 22 pruebas aprobadas |
 | Evaluación | 14 pruebas aprobadas |
-| Contenido (regresiones existentes) | 25 pruebas aprobadas |
+| Contenido, incluida integración Juan | 47 pruebas aprobadas |
 | Quality | 6 pruebas aprobadas |
-| Arquitectura | 6 pruebas aprobadas; check de fronteras nuevas aprobado |
-| Learning unitario | 2 pruebas aprobadas |
+| Arquitectura | 8 pruebas aprobadas; 24 archivos de dominio/aplicación verificados |
+| Learning y Planificación | 16 pruebas aprobadas |
+| Integración HTTP adicional Juan | 5/5: preferencias, recordatorios, PDF privado, enlaces firmados y logout |
 | Integración PostgreSQL | 22 pruebas aprobadas |
 | Compilación frontend | Aprobada |
 | Lint frontend global | No aprobado; deuda heredada aún presente |
@@ -31,7 +32,7 @@ La ejecución HTTP/BD de QA midió 54,45% de líneas del backend en su reporte i
 
 El análisis remoto inicial de main (33647f6e) fallaba por seguridad C, con 27 incidencias nuevas y sin cobertura importada. Se repararon instalación con scripts, entradas de log, extracción de dispositivo, resolución de Docker y complejidad localizada. Las migraciones checksummed ya aplicadas no se reescribieron por estilo. Se eliminaron exclusiones funcionales de sonar-project.properties.
 
-El usuario configuró en GitHub el secreto PAESOFTK. El workflow admite SONAR_TOKEN o ese nombre y utiliza únicamente el secreto en el runner. La transición al análisis CI mantiene las reglas del gate y añade LCOV; el resultado remoto debe registrarse después de ejecutar el PR.
+El usuario configuró en GitHub el secreto PAESOFTK. El workflow admite SONAR_TOKEN o ese nombre y utiliza únicamente el secreto en el runner. Automatic Analysis está desactivado al sustituirlo por CI; el gate se conserva. Las ejecuciones 40427862304 y 40428706562 aprobaron las 64 pruebas y tres regresiones de seguridad, pero fallaron antes del scanner al exportar cobertura de contenedores en Linux. Se corrigen permisos de lectura y propiedad del directorio QA de los servicios sin privilegios. Falta verificar el nuevo análisis remoto.
 
 Referencia de configuración: [documentación oficial de SonarQube para GitHub Actions](https://docs.sonarsource.com/sonarqube-cloud/analyzing-source-code/ci-based-analysis/github-actions-for-sonarcloud/).
 

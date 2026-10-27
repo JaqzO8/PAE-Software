@@ -14,6 +14,7 @@ export interface StudyPreference {
   endTime: string;
   subjects: string[];
   remindersEnabled: boolean;
+  timeZone: string;
 }
 
 export interface StudySuggestion {
@@ -42,17 +43,17 @@ export interface PlanningOverview {
 }
 
 export const getPlanningOverview = async (): Promise<PlanningOverview> => {
-  const response = await api.get<{ data: PlanningOverview }>("/content/planning");
+  const response = await api.get<{ data: PlanningOverview }>("/learning/planning");
   return response.data.data;
 };
 
 export const updateStudyPreference = async (preference: StudyPreference): Promise<StudyPreference> => {
-  const response = await api.put<{ data: StudyPreference }>("/content/planning/preferences", preference);
+  const response = await api.put<{ data: StudyPreference }>("/learning/planning/preferences", preference);
   return response.data.data;
 };
 
 export const generateStudyReminders = async (): Promise<StudyReminder[]> => {
-  const response = await api.post<{ data: StudyReminder[] }>("/content/planning/reminders/generate");
+  const response = await api.post<{ data: StudyReminder[] }>("/learning/planning/reminders/generate");
   return response.data.data;
 };
 
@@ -60,6 +61,25 @@ export const updateReminderStatus = async (
   id: number,
   status: "pendiente" | "completado" | "omitido"
 ): Promise<StudyReminder> => {
-  const response = await api.patch<{ data: StudyReminder }>(`/content/planning/reminders/${id}/status`, { status });
+  const response = await api.patch<{ data: StudyReminder }>(`/learning/planning/reminders/${id}/status`, { status });
+  return response.data.data;
+};
+
+export const cancelReminder = async (id: number): Promise<StudyReminder> => {
+  const response = await api.patch<{ data: StudyReminder }>(`/learning/planning/reminders/${id}/cancel`);
+  return response.data.data;
+};
+
+export type PomodoroState = "idle" | "running" | "paused" | "completed";
+
+export const transitionPomodoro = async (
+  currentState: PomodoroState,
+  action: "start" | "pause" | "resume" | "finish",
+  secondsElapsed: number
+): Promise<{ currentState: PomodoroState; secondsElapsed: number }> => {
+  const response = await api.post<{ data: { currentState: PomodoroState; secondsElapsed: number } }>(
+    "/learning/planning/pomodoro",
+    { currentState, action, secondsElapsed }
+  );
   return response.data.data;
 };

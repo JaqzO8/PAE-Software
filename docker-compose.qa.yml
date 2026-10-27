@@ -59,10 +59,23 @@ services:
     build: ./backend/services/quality-service
     volumes: ['./tests/qa/coverage.cjs:/qa/coverage.cjs:ro', './coverage/qa/quality:/coverage']
     environment: { <<: *runtime, PORT: 3005 }
+  learning-service:
+    build: ./backend/services/learning-service
+    volumes: ['./tests/qa/coverage.cjs:/qa/coverage.cjs:ro', './coverage/qa/learning:/coverage']
+    environment:
+      <<: *runtime
+      LEARNING_PORT: 3006
+      LEARNING_HOST: 0.0.0.0
+      PGHOST: postgres
+      PGPORT: 5432
+      PGDATABASE: qa_learning
+      PGUSER: pae_qa
+      PGPASSWORD: ${QA_DB_PASSWORD}
+    depends_on: { postgres: { condition: service_healthy } }
   nginx-gateway:
     build: ./backend/nginx
     ports: ['127.0.0.1:13000:3000']
-    depends_on: [auth-service, community-service, exam-service, content-service, quality-service]
+    depends_on: [auth-service, community-service, exam-service, content-service, quality-service, learning-service]
   frontend:
     build: ./frontend
     ports: ['127.0.0.1:15173:5173']

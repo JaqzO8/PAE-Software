@@ -46,4 +46,4 @@ Fecha de revisión: 25 de octubre de 2026 (America/Lima). Base: `origin/develop`
 - Implementados con deuda técnica pendiente: frontend compila, pero lint global no está limpio; varios hooks y tipos heredados requieren corrección. No equivale a un fallo demostrado de todos los flujos.
 - Parciales: entrega externa de correo/MFA, OAuth social, conteos diarios de partidas y cobertura automatizada de todas las pantallas. El flujo MFA de QA usa código de desarrollo y no certifica entrega de segundo factor en producción.
 - Piloto: ledger/inbox/outbox de Learning comprobado por integración; no implica migración completa de gamificación ni cierre de todas las extensiones propuestas.
-- Pendientes del equipo: Contenido/Planificación y sus contratos de resultados; no se incorporan otras ramas automáticamente.
+- Actualización del 27 de octubre: se integra Juan_Rengifo por autorización explícita. Se corrigen ruta de migraciones, arranque sobre BD existente/nueva, JSON de Planificación, identidad no sobrescribible y revocación en Learning/descargas privadas. Permanecen pendientes la aceptación de producto y las integraciones externas descritas en MODULOS_PENDIENTES.md.

@@ -5,7 +5,7 @@ import { compose } from '../tests/qa/harness.mjs';
 
 const output = path.resolve('coverage/qa-v8');
 await mkdir(output, { recursive: true });
-for (const service of ['auth', 'community', 'exam', 'content', 'quality']) {
+for (const service of ['auth', 'community', 'exam', 'content', 'quality', 'learning']) {
     compose('exec', '-T', `${service}-service`, 'env', '-u', 'NODE_V8_COVERAGE', 'node', '-e', `
         const fs = require('node:fs');
         const before = new Set(fs.readdirSync('/coverage'));
@@ -47,4 +47,4 @@ for (const service of ['auth', 'community', 'exam', 'content', 'quality']) {
         await writeFile(path.join(output, `${service}-${file}`), JSON.stringify(data));
     }
 }
-console.log('Cobertura V8 de los cinco servicios exportada; incluye solo código ejecutado.');
+console.log('Cobertura V8 de los seis servicios exportada; incluye solo código ejecutado.');

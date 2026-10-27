@@ -11,4 +11,4 @@ La instrucción directa del usuario amplía el documento adjunto: **32 casos óp
 
 Distribución: unitarias, carga, rendimiento, concurrencia y estrés: 4 óptimas + 4 pésimas cada una. Sistema, integración, regresión y aceptación: 3 óptimas + 3 pésimas cada una. Total: 32 + 32. Las comprobaciones auxiliares existentes no se cuentan dos veces para inflar la matriz.
 
-Contenido y Planificación quedan fuera de finalización funcional. Las reparaciones necesarias de límites compartidos se documentan sin introducir implementaciones ficticias. Se preservan datos de pruebas_pae y trabajo de otras ramas.
+El 27 de octubre el usuario amplió el alcance e indicó integrar Juan_Rengifo. Se incorporan Contenido y Planificación, se verifican sus migraciones y contratos HTTP y se conservan las protecciones de sesión. La aceptación completa de funcionalidades y proveedores externos sigue pendiente. Se preservan los datos de pruebas_pae.

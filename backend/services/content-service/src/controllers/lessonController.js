@@ -1,5 +1,7 @@
 const PDFDocument = require('pdfkit');
-const { Lesson, LessonProgress, Repository, StudySetting } = require('../models');
+const { Lesson, LessonProgress, Repository, StudySetting, OutboxEvent } = require('../models');
+const { sequelize } = require('../config/database');
+const crypto = require('crypto');
 
 const parseJsonArray = (value) => {
     if (!value) return [];
@@ -295,13 +297,34 @@ class LessonController {
                 defaults: { id_leccion: lesson.id_leccion, id_usuario: req.user.id },
             });
 
-            await progress.update({
-                completada: true,
-                puntuacion: puntuacion !== undefined ? puntuacion : progress.puntuacion,
-                tiempo_segundos: tiempo_segundos
-                    ? Math.max(parseInt(tiempo_segundos, 10), Number(progress.tiempo_segundos || 0))
-                    : progress.tiempo_segundos,
-                fecha_completado: new Date(),
+            const wasCompleted = Boolean(progress.completada);
+            const completedAt = new Date();
+            await sequelize.transaction(async (transaction) => {
+                await progress.update({
+                    completada: true,
+                    puntuacion: puntuacion !== undefined ? puntuacion : progress.puntuacion,
+                    tiempo_segundos: tiempo_segundos
+                        ? Math.max(parseInt(tiempo_segundos, 10), Number(progress.tiempo_segundos || 0))
+                        : progress.tiempo_segundos,
+                    fecha_completado: completedAt,
+                }, { transaction });
+                if (!wasCompleted) {
+                    await OutboxEvent.create({
+                        event_id: crypto.randomUUID(),
+                        event_type: 'LeccionCompletada.v1',
+                        schema_version: 1,
+                        producer: 'content',
+                        payload: {
+                            lessonId: String(lesson.id_leccion),
+                            repositoryId: String(lesson.id_repositorio),
+                            userId: String(req.user.id),
+                            completedAt: completedAt.toISOString(),
+                            correlationId: crypto.randomUUID(),
+                        },
+                        status: 'pending',
+                        occurred_at: completedAt,
+                    }, { transaction });
+                }
             });
 
             return res.status(200).json({

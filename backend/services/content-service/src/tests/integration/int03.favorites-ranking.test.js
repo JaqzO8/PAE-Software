@@ -46,6 +46,7 @@ describe('INT-03 - Favoritos y ranking de repositorios populares', () => {
 
     const resourceMock = {
       activo: true,
+      url_externa: 'https://example.com/material',
       repositorio: repoMock,
       increment: jest.fn(),
     };

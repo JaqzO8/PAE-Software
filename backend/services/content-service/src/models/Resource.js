@@ -45,6 +45,7 @@ const Resource = sequelize.define('recursos', {
         allowNull: true,
         comment: 'Tamaño en bytes',
     },
+    checksum_sha256: { type: DataTypes.STRING(64), allowNull: true },
     extension: {
         type: DataTypes.STRING(10),
         allowNull: true,
@@ -70,6 +71,30 @@ const Resource = sequelize.define('recursos', {
         allowNull: false,
         defaultValue: true,
     },
+    publicado: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+    },
+    fecha_publicacion: {
+        type: DataTypes.DATE,
+        allowNull: true,
+    },
+    client_request_id: {
+        type: DataTypes.UUID,
+        allowNull: true,
+        unique: true,
+    },
+    fuente_url: { type: DataTypes.STRING(500), allowNull: true },
+    licencia: { type: DataTypes.STRING(160), allowNull: true },
+    estado_editorial: {
+        type: DataTypes.STRING(20),
+        allowNull: false,
+        defaultValue: 'pendiente',
+        validate: { isIn: [['pendiente', 'aprobado', 'rechazado']] },
+    },
+    revisor_editorial_id: { type: DataTypes.INTEGER, allowNull: true },
+    fecha_revision: { type: DataTypes.DATE, allowNull: true },
 }, {
     tableName: 'recursos',
     timestamps: false,
@@ -78,6 +103,7 @@ const Resource = sequelize.define('recursos', {
         { fields: ['tipo_recurso'] },
         { fields: ['activo'] },
         { fields: ['orden'] },
+        { fields: ['publicado'] },
     ],
 });
 

@@ -1,10 +1,10 @@
 # Alcance pendiente y dependencias
 
-## Fuera del cierre de esta estabilización
+## Integración de Contenido y Planificación autorizada el 27 de octubre
 
-Contenido y Planificación todavía requieren la entrega de su responsable. Se mantienen los contratos /api/content/* y las pantallas existentes; las correcciones de autenticación y dependencias compartidas no constituyen su aceptación funcional. No integrar automáticamente Juan_Rengifo ni otras ramas.
+Se incorpora Juan_Rengifo (c81275c) a codex/estabilizacion-qa por petición expresa del usuario. Contenido mantiene /api/content/*; Planificación usa /api/learning/planning en Learning con PostgreSQL propio. No se fusiona automáticamente develop ni main.
 
-Antes de integrar esos módulos: comparar contratos con la SPA; aplicar migraciones sobre copia de QA; validar permisos, persistencia, consultas y errores; ejecutar las 64 regresiones y las suites propias; revisar eventos que alimentan progreso y gamificación. El equipo debe confirmar la trazabilidad requisito/historia de usuario de esa entrega.
+La integración añade pruebas HTTP reales de preferencias, recordatorios, aislamiento, PDF privado, enlaces firmados y revocación. Se corrigen migraciones, lectura JSON y suplantación de userId. El equipo aún debe aceptar la trazabilidad completa de requisitos e historias. El transporte Outbox depende de configuración externa; la proyección recordLessonCompletionProjection de Learning aún es un adaptador provisional sin persistencia y no debe presentarse como integración productiva de progreso.
 
 ## Pendientes del alcance existente que impiden afirmar cierre total
 

@@ -6,6 +6,7 @@ function createApp() {
     const helmet = require('helmet');
     const rateLimit = require('express-rate-limit');
     const config = require('./config/env');
+    const { sequelize } = require('./config/database');
     const { errorHandler, notFound } = require('./middlewares/errorMiddleware');
 
     // Importar rutas
@@ -15,7 +16,6 @@ function createApp() {
     const favoriteRoutes = require('./routes/favoriteRoutes');
     const categoryRoutes = require('./routes/categoryRoutes');
     const lessonRoutes = require('./routes/lessonRoutes');
-    const planningRoutes = require('./routes/planningRoutes');
 
     const app = express();
     app.set('trust proxy', 1);
@@ -43,36 +43,10 @@ function createApp() {
     app.use(express.urlencoded({ extended: true }));
 
     // =================================================
-    // SERVIR ARCHIVOS ESTÁTICOS - UPLOADS
+    // ACCESO CONTROLADO Y SEGURO A ARCHIVOS - UPLOADS (JUA-02)
     // =================================================
-    console.log('📁 Sirviendo archivos estáticos desde:', config.UPLOAD_PATH);
-
-    // Middleware para servir archivos estáticos con logs
-    app.use('/uploads', (req, res, next) => {
-        console.log(JSON.stringify({ event: 'file_request', path: req.path.slice(0, 200) }));
-        next();
-    }, express.static(config.UPLOAD_PATH, {
-        setHeaders: (res, filePath) => {
-            // Agregar headers CORS para imágenes
-            res.setHeader('Access-Control-Allow-Origin', '*');
-            res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-
-            // Cache para mejorar performance
-            res.setHeader('Cache-Control', 'public, max-age=86400'); // 1 día
-
-            console.log('✅ Sirviendo archivo:', filePath);
-        }
-    }));
-
-    // Middleware para manejar 404 en uploads
-    app.use('/uploads', (req, res) => {
-        console.error(JSON.stringify({ event: 'file_not_found', path: req.path.slice(0, 200) }));
-        res.status(404).json({
-            success: false,
-            message: 'Archivo no encontrado',
-            path: req.url
-        });
-    });
+    const { secureUploadsMiddleware } = require('./middlewares/secureUploadsMiddleware');
+    app.use('/uploads', secureUploadsMiddleware);
 
     // =================================================
     // RATE LIMITING
@@ -91,7 +65,6 @@ function createApp() {
     app.use('/api/content/repositories', repositoryRoutes);
     app.use('/api/content/resources', resourceRoutes);
     app.use('/api/content/lessons', lessonRoutes);
-    app.use('/api/content/planning', planningRoutes);
     app.use('/api/content/favorites', favoriteRoutes);
     app.use('/api/content/categories', categoryRoutes);
     app.use('/api/content/tags', categoryRoutes);
@@ -102,8 +75,16 @@ function createApp() {
             success: true,
             message: 'Content Service is healthy',
             timestamp: new Date().toISOString(),
-            uploadPath: config.UPLOAD_PATH
         });
+    });
+
+    app.get('/api/content/ready', async (req, res) => {
+        try {
+            await sequelize.authenticate();
+            return res.status(200).json({ success: true, status: 'ready', timestamp: new Date().toISOString() });
+        } catch (error) {
+            return res.status(503).json({ success: false, status: 'not-ready', timestamp: new Date().toISOString() });
+        }
     });
 
     // =================================================

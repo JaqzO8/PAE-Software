@@ -15,6 +15,13 @@ const result = spawnSync(dockerExecutable(), ['compose', '-p', 'pae_qa', '--env-
 if (result.error) throw result.error;
 process.exitCode = result.status ?? 1;
 if (command === 'up' && result.status === 0) {
+    // These two images run as node (UID 1000). Docker creates bind directories as root.
+    // Change ownership of the QA coverage directories only, keeping the service unprivileged.
+    for (const service of ['quality-service', 'learning-service']) {
+        const permissions = spawnSync(dockerExecutable(), ['compose', '-p', 'pae_qa', '--env-file', secrets, '-f', path.join(root, 'docker-compose.qa.yml'), 'exec', '-T', '--user', 'root', service, 'env', '-u', 'NODE_V8_COVERAGE', 'node', '-e', 'require("node:fs").chownSync("/coverage", 1000, 1000)'], { cwd: root, stdio: 'inherit' });
+        if (permissions.error) throw permissions.error;
+        if (permissions.status !== 0) throw new Error(`Cannot prepare QA coverage for ${service}`);
+    }
     // Nginx resolves upstream container addresses at startup. Recreate after service builds.
     const proxy = spawnSync(dockerExecutable(), ['compose', '-p', 'pae_qa', '--env-file', secrets, '-f', path.join(root, 'docker-compose.qa.yml'), 'up', '-d', '--force-recreate', '--no-deps', 'nginx-gateway', 'frontend'], { cwd: root, stdio: 'inherit' });
     if (proxy.error) throw proxy.error;
