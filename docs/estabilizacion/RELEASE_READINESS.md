@@ -20,6 +20,7 @@ Estado: **candidato de estabilización para revisión; no aprobado para producci
 
 ## Secuencia de integración
 
-Publicar codex/estabilizacion-qa y abrir PR hacia develop. CI ejecuta pruebas y análisis. Resolver fallos antes de solicitar aprobación. Después de revisión del equipo, integrar a develop y repetir validación. Preparar develop → main conservando los cambios de README presentes en main, solo al cumplir los criterios; no fusionar automáticamente. Contenido/Planificación se entregarán por su flujo separado.
+Publicar codex/estabilizacion-qa y abrir PR hacia develop. CI ejecuta pruebas y análisis. Resolver fallos antes de solicitar aprobación. Después de revisión del equipo, integrar a develop y repetir validación. Preparar develop → main conservando los cambios de README presentes en main, solo al cumplir los criterios; no fusionar automáticamente. Contenido/Planificación de Juan_Rengifo ya están incorporados en este PR por autorización explícita; su aceptación completa sigue sujeta a revisión.
 
 Reproducción local: npm ci; instalar dependencias de servicios; npm run qa:up; npm run test:coverage; npm run test:qa; npm run test:qa:security; npm run qa:coverage. Usar Node 24, Docker y Chrome local (o Playwright Chromium con QA_BROWSER_CHANNEL=chromium). npm run qa:stop detiene el entorno conservando los datos. No ejecutar down -v sobre entornos del equipo.
+

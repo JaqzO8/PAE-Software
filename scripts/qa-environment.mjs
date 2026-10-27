@@ -11,6 +11,10 @@ const command = process.argv[2] || 'up';
 const commands = { up: ['up', '-d', '--build'], stop: ['stop'], status: ['ps'], logs: ['logs', '--tail', '30'] };
 if (!commands[command]) throw new Error('Allowed actions: up, stop, status, logs');
 mkdirSync(path.join(root, 'test-results/qa'), { recursive: true });
+// Create the report parent as the host user before Docker creates bind mounts as root.
+for (const service of ['auth', 'community', 'content', 'exam', 'quality', 'learning']) {
+    mkdirSync(path.join(root, 'coverage/qa', service), { recursive: true });
+}
 const result = spawnSync(dockerExecutable(), ['compose', '-p', 'pae_qa', '--env-file', secrets, '-f', path.join(root, 'docker-compose.qa.yml'), ...commands[command]], { cwd: root, stdio: 'inherit' });
 if (result.error) throw result.error;
 process.exitCode = result.status ?? 1;

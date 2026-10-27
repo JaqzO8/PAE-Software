@@ -48,6 +48,7 @@ jobs:
           path: |
             test-results/qa/
             coverage/unit/
+            coverage/jest/
             coverage/qa/
             docs/estabilizacion/RESULTADOS_PRUEBAS.md
       - name: SonarQube analysis with coverage
