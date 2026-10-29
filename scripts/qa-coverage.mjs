@@ -40,7 +40,7 @@ for (const service of ['auth', 'community', 'exam', 'content', 'quality', 'learn
     if (!files.length) throw new Error(`No coverage produced for ${service}`);
     for (const file of files) {
         const data = JSON.parse(await readFile(path.join(rawDir, file), 'utf8'));
-        data.result = data.result.filter(entry => entry.url.startsWith('file:///app/src/'));
+        data.result = data.result.filter(entry => entry.url.startsWith('file:///app/src/') || entry.url.startsWith('file:///app/scripts/'));
         for (const entry of data.result) {
             entry.url = pathToFileURL(path.resolve(`backend/services/${service}-service`, entry.url.slice('file:///app/'.length))).href;
         }

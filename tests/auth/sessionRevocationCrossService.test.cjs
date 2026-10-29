@@ -45,3 +45,24 @@ test('RIC-11: autoridad no disponible falla cerrado en servicios consumidores', 
     try { for(const middleware of consumers) { const res=response();await middleware.verifyToken({headers:{authorization:'Bearer '+token}},res,()=>assert.fail('Fallo abierto'));assert.equal(res.code,503); } }
     finally { if(previous===undefined)delete process.env.AUTH_SERVICE_URL;else process.env.AUTH_SERVICE_URL=previous; }
 });
+
+test('Identity credentials require HTTPS in production and missing configuration fails closed', async t => {
+    const learning = require('../../backend/services/learning-service/src/middlewares/jwtAuth');
+    const token = TokenService.generateToken({ id: 88, rol: 'estudiante' });
+    const previousUrl = process.env.AUTH_SERVICE_URL, previousMode = process.env.NODE_ENV;
+    t.mock.method(globalThis, 'fetch', async () => assert.fail('Insecure request transmitted'));
+    try {
+        process.env.NODE_ENV = 'production';
+        for (const url of ['http://identity.example.test', 'ftp://identity.example.test', '']) {
+            process.env.AUTH_SERVICE_URL = url;
+            for (const handler of [...consumers.map(item => item.verifyToken), learning.authenticate]) {
+                const res = response();
+                await handler({ headers: { authorization: 'Bearer ' + token } }, res, () => assert.fail('Insecure identity accepted'));
+                assert.equal(res.code, 503);
+            }
+        }
+    } finally {
+        process.env.NODE_ENV = previousMode;
+        if (previousUrl === undefined) delete process.env.AUTH_SERVICE_URL; else process.env.AUTH_SERVICE_URL = previousUrl;
+    }
+});

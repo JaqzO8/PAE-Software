@@ -32,7 +32,7 @@ async function secureUploadsMiddleware(req, res, next) {
             });
         }
 
-        const normalizedUrl = `/uploads/${cleanSubpath.replace(/\\/g, '/')}`;
+        const normalizedUrl = `/uploads/${cleanSubpath.replaceAll('\\', '/')}`;
         const filename = path.basename(requestedFilePath);
 
         // 1. Si es portada de repositorio público y activo -> permitir

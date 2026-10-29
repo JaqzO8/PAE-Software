@@ -1,12 +1,13 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { authenticate } = require('../src/middlewares/jwtAuth');
+process.env.AUTH_SERVICE_URL = 'https://identity.example.test';
 
 function response() { return { status(code) { this.code = code; return this; }, json(body) { this.body = body; return this; } }; }
 
 test('identity authority supplies current active user and role', async t => {
     t.mock.method(globalThis, 'fetch', async (url, options) => {
-        assert.ok(url.endsWith('/api/auth/verify'));
+        assert.ok(String(url).endsWith('/api/auth/verify'));
         assert.equal(options.headers.Authorization, 'Bearer synthetic-token');
         return { ok: true, json: async () => ({ valid: true, user: { id: 7, activo: true, rol: 'estudiante' } }) };
     });

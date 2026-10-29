@@ -52,7 +52,7 @@ services:
     depends_on: { postgres: { condition: service_healthy } }
   content-service:
     build: ./backend/services/content-service
-    volumes: ['./tests/qa/coverage.cjs:/qa/coverage.cjs:ro', './coverage/qa/content:/coverage']
+    volumes: ['./tests/qa/coverage.cjs:/qa/coverage.cjs:ro', './tests/qa/content-repository.cjs:/qa/content-repository.cjs:ro', './coverage/qa/content:/coverage']
     environment: { <<: *runtime, PORT: 3003, DB_NAME: qa_content, UPLOAD_PATH: /app/uploads }
     depends_on: { postgres: { condition: service_healthy } }
   quality-service:

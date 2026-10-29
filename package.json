@@ -32,8 +32,9 @@
     "qa:stop": "node scripts/qa-environment.mjs stop",
     "qa:spec": "node tests/qa/run.mjs --spec-only",
     "test:qa": "node tests/qa/run.mjs",
-    "qa:coverage": "node scripts/qa-coverage.mjs && c8 report --all --include \"backend/services/**/src/**/*.js\" --exclude \"**/tests/**\" --exclude \"**/*.test.js\" --reporter=lcov --reporter=json-summary --reporter=text-summary --temp-directory coverage/qa-v8 --reports-dir coverage/qa",
-    "test:coverage": "c8 --all --include \"backend/services/**/src/**/*.js\" --exclude \"**/tests/**\" --exclude \"**/*.test.js\" --reporter=lcov --reporter=json-summary --reporter=text-summary --reports-dir coverage/unit node scripts/unit-coverage.mjs",
-    "test:qa:security": "node tests/qa/security-regressions.mjs"
+    "qa:coverage": "node scripts/qa-coverage.mjs && c8 report --all --include \"backend/services/**/src/**/*.js\" --include \"backend/services/**/scripts/**/*.js\" --exclude \"**/tests/**\" --exclude \"**/*.test.js\" --reporter=lcov --reporter=json-summary --reporter=text-summary --temp-directory coverage/qa-v8 --reports-dir coverage/qa",
+    "test:coverage": "c8 --all --include \"backend/services/**/src/**/*.js\" --include \"scripts/**/*.mjs\" --exclude \"**/tests/**\" --exclude \"**/*.test.js\" --reporter=lcov --reporter=json-summary --reporter=text-summary --reports-dir coverage/unit node scripts/unit-coverage.mjs",
+    "test:qa:security": "node tests/qa/security-regressions.mjs",
+    "qa:host-coverage": "c8 report --all --include \"scripts/**/*.mjs\" --reporter=lcov --reporter=json-summary --temp-directory coverage/host-v8 --reports-dir coverage/host"
   }
 }

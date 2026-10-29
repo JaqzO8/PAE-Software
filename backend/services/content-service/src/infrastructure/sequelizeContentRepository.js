@@ -1,4 +1,5 @@
-const crypto = require('crypto');
+const crypto = require('node:crypto');
+const { sequelize } = require('../config/database');
 const { Repository, Resource, Lesson, LessonProgress, Tag, RepositoryTag } = require('../models');
 
 /**
@@ -71,7 +72,7 @@ function createSequelizeContentRepository({ transaction = null } = {}) {
         },
 
         recordOutboxEvent: async (eventPayload) => {
-            // Si la tabla outbox existe o en fallback simulado
+            // A durable publication must fail when the event cannot be persisted.
             try {
                 const { OutboxEvent } = require('../models');
                 await OutboxEvent.create({
@@ -90,7 +91,7 @@ function createSequelizeContentRepository({ transaction = null } = {}) {
         },
 
         claimPendingEvents: async (limit, now) => {
-            const { OutboxEvent, sequelize } = require('../models');
+            const { OutboxEvent } = require('../models');
             const { Op } = require('sequelize');
             const staleBefore = new Date(new Date(now).getTime() - 5 * 60 * 1000);
             return sequelize.transaction(async (tx) => {

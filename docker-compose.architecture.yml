@@ -22,6 +22,11 @@ services:
   frontend:
     build:
       context: ${PAE_SOURCE_ROOT}/frontend
+  quality-service:
+    build:
+      context: ${PAE_SOURCE_ROOT}/backend/services/quality-service
+    environment:
+      AUTH_SERVICE_URL: ${AUTH_SERVICE_URL:?Identity URL required}
   learning-service:
     build:
       context: ${PAE_SOURCE_ROOT}/backend/services/learning-service
@@ -29,6 +34,8 @@ services:
       LEARNING_PORT: 3006
       LEARNING_HOST: 0.0.0.0
       JWT_SECRET: ${JWT_SECRET:?JWT secret required}
+      NODE_ENV: ${NODE_ENV:-development}
+      AUTH_SERVICE_URL: ${AUTH_SERVICE_URL:?Identity URL required}
       PGHOST: learning-db
       PGPORT: 5432
       PGDATABASE: learning_pilot

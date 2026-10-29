@@ -5,7 +5,12 @@ async function authenticate(req, res, next) {
         return res.status(401).json({ success: false, message: 'Autenticación requerida' });
     }
     try {
-        const response = await fetch(`${process.env.AUTH_SERVICE_URL || 'http://auth-service:3001'}/api/auth/verify`, {
+        const endpoint = new URL('/api/auth/verify', process.env.AUTH_SERVICE_URL);
+        const localDevelopment = ['development', 'test'].includes(process.env.NODE_ENV);
+        if (endpoint.protocol !== 'https:' && !(localDevelopment && endpoint.protocol === 'http:')) {
+            throw new Error('Identity transport requires HTTPS outside development and tests');
+        }
+        const response = await fetch(endpoint, {
             headers: { Authorization: authorization }, signal: AbortSignal.timeout(2500),
         });
         if (!response.ok) return res.status(response.status >= 500 ? 503 : 401).json({ success: false, message: 'Sesión no disponible' });

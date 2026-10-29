@@ -26,5 +26,5 @@ async function startServer() {
     process.once('SIGINT', shutdown);
     return server;
 }
-if (require.main === module) startServer().catch(error => { console.error(error.message); process.exitCode = 1; });
+if (require.main?.filename === __filename) startServer().catch(error => { console.error(error.message); process.exitCode = 1; });
 module.exports = { startServer };

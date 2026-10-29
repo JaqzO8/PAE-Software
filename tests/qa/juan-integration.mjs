@@ -46,3 +46,4 @@ assert.equal((await fetch(direct, { headers: { Authorization: `Bearer ${teacher.
 await request('/auth/logout', { method: 'POST', account: student });
 await request(planning, { account: student, status: 401 });
 console.log('PASS JUA-I05: logout revokes planning and both private download paths');
+process.stdout.write(compose('exec', '-T', 'content-service', 'node', '/qa/content-repository.cjs', String(teacher.user.id)));

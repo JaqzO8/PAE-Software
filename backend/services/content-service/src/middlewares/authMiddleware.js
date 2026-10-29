@@ -8,7 +8,12 @@ async function verifySession(token) {
     if (decoded.scope === 'mfa_challenge') throw Object.assign(new Error('Se requiere completar MFA'), { status: 401 });
     let response;
     try {
-        response = await fetch((process.env.AUTH_SERVICE_URL || 'http://auth-service:3001') + '/api/auth/verify', {
+        const endpoint = new URL('/api/auth/verify', process.env.AUTH_SERVICE_URL);
+        const localDevelopment = ['development', 'test'].includes(process.env.NODE_ENV);
+        if (endpoint.protocol !== 'https:' && !(localDevelopment && endpoint.protocol === 'http:')) {
+            throw new Error('Identity transport requires HTTPS outside development and tests');
+        }
+        response = await fetch(endpoint, {
             headers: { Authorization: 'Bearer ' + token }, signal: AbortSignal.timeout(2500),
         });
     } catch { throw Object.assign(new Error('No se pudo verificar la sesión'), { status: 503 }); }
