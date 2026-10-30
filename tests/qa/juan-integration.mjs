@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { account, request, apiOrigin, compose } from './harness.mjs';
+import { account, request, apiOrigin, compose, sql } from './harness.mjs';
 
 assert.equal(JSON.parse(compose('config', '--format', 'json')).name, 'pae_qa');
 const student = await account(), outsider = await account(), teacher = await account('docente');
@@ -40,6 +40,36 @@ await request(link, { account: outsider, status: 401 });
 await request(link, { status: 401 });
 console.log('PASS JUA-I04: signed download requires the active intended user');
 
+const resourcePath = `/content/resources/${resource.id_recurso}`;
+await request(`${resourcePath}/publish`, { method: 'POST', account: teacher, status: 409 });
+await request(`${resourcePath}/editorial-review`, { method: 'POST', account: teacher, data: { estado: 'invalid' }, status: 400 });
+await request(`${resourcePath}/editorial-review`, { method: 'POST', account: teacher, data: { estado: 'aprobado' } });
+await request(`${resourcePath}/publish`, { method: 'POST', account: teacher });
+assert.equal((await request(`${resourcePath}/publish`, { method: 'POST', account: teacher })).body.replayed, true);
+for (const actor of [undefined, outsider]) {
+    await request(resourcePath, { account: actor, status: 404 });
+    await request(`/content/resources?repositorio_id=${repository.id_repositorio}`, { account: actor, status: 404 });
+}
+assert.equal((await request(resourcePath, { account: teacher })).body.data.publicado, true);
+await request(resourcePath, { method: 'PUT', account: teacher, data: { url_externa: 'javascript:alert(1)' }, status: 400 });
+assert.equal(Number(sql('qa_content', `SELECT count(*) FROM content_outbox_events WHERE event_type='RecursoPublicado.v1' AND payload->>'resourceId'='${resource.id_recurso}'`)), 1);
+console.log('PASS JUA-I06: editorial publication is durable and idempotent; private metadata stays private');
+
+const lesson = (await request('/content/lessons', { method: 'POST', account: teacher, status: 201, data: {
+    id_repositorio: repository.id_repositorio, titulo: 'Lectura privada QA', contenido: 'Contenido reservado al propietario',
+} })).body.data;
+const lessonPath = `/content/lessons/${lesson.id_leccion}`;
+await request(lessonPath, { account: teacher });
+await request(lessonPath, { account: outsider, status: 404 });
+await request(`/content/lessons?repositorio_id=${repository.id_repositorio}`, { account: outsider, status: 404 });
+await request(`${lessonPath}/start`, { method: 'POST', account: outsider, status: 404 });
+await request(`${lessonPath}/summary`, { account: teacher, status: 403 });
+await request(`${lessonPath}/complete`, { method: 'POST', account: teacher, data: { tiempo_segundos: 60 } });
+await request(`${lessonPath}/complete`, { method: 'POST', account: teacher, data: { tiempo_segundos: 65 } });
+await request(`${lessonPath}/summary`, { account: teacher });
+assert.equal(Number(sql('qa_content', `SELECT count(*) FROM content_outbox_events WHERE event_type='LeccionCompletada.v1' AND payload->>'lessonId'='${lesson.id_leccion}'`)), 1);
+console.log('PASS JUA-I07: private lessons enforce ownership and completion replay emits one event');
+
 await request('/auth/logout', { method: 'POST', account: teacher });
 await request(link, { account: teacher, status: 401 });
 assert.equal((await fetch(direct, { headers: { Authorization: `Bearer ${teacher.token}` } })).status, 401);
@@ -47,3 +77,4 @@ await request('/auth/logout', { method: 'POST', account: student });
 await request(planning, { account: student, status: 401 });
 console.log('PASS JUA-I05: logout revokes planning and both private download paths');
 process.stdout.write(compose('exec', '-T', 'content-service', 'node', '/qa/content-repository.cjs', String(teacher.user.id)));
+

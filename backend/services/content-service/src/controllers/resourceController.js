@@ -148,6 +148,9 @@ class ResourceController {
             if (!repository) return res.status(404).json({ success: false, message: 'Repositorio no encontrado' });
             const canViewDrafts = req.user?.rol === 'admin'
                 || String(req.user?.id) === String(repository.id_profesor);
+            if (repository.publico === false && !canViewDrafts) {
+                return res.status(404).json({ success: false, message: 'Repositorio no encontrado' });
+            }
             const resources = await Resource.findAll({
                 where,
                 order: [['orden', 'ASC'], ['fecha_subida', 'DESC']],
@@ -178,7 +181,8 @@ class ResourceController {
                 include: [{
                     model: Repository,
                     as: 'repositorio',
-                    attributes: ['id_repositorio', 'titulo', 'id_profesor'],
+                    attributes: ['id_repositorio', 'titulo', 'id_profesor', 'publico'],
+                    where: { activo: true },
                 }],
             });
 
@@ -189,7 +193,8 @@ class ResourceController {
                 });
             }
 
-            if (resource.publicado === false && !ResourceController._isOwnerOrAdmin(resource, req.user)) {
+            if ((resource.publicado === false || resource.repositorio.publico === false)
+                && !ResourceController._isOwnerOrAdmin(resource, req.user)) {
                 return res.status(404).json({ success: false, message: 'Recurso no encontrado' });
             }
 
@@ -382,6 +387,7 @@ class ResourceController {
             }
 
             const updateData = {};
+            ResourceController._validateOptionalHttpUrl(url_externa, 'url_externa');
             if (titulo) updateData.titulo = titulo.trim();
             if (descripcion !== undefined) updateData.descripcion = descripcion?.trim() || null;
             if (url_externa !== undefined) updateData.url_externa = url_externa || null;

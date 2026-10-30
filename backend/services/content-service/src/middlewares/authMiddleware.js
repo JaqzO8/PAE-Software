@@ -44,6 +44,11 @@ const isAuthenticated = (req, res, next) => {
     return next();
 };
 
+const verifyOptionalToken = (req, res, next) => {
+    if (req.headers.authorization === undefined) return next();
+    return verifyToken(req, res, next);
+};
+
 const isTeacher = (req, res, next) => {
     const role = req.user?.rol;
 
@@ -62,4 +67,5 @@ module.exports = {
     isAuthenticated,
     isTeacher,
     verifySession,
+    verifyOptionalToken,
 };

@@ -67,7 +67,7 @@ class LessonController {
             }
 
             const where = { id_repositorio: repositorio_id, activo: true };
-            if (req.user?.rol !== 'docente' && req.user?.rol !== 'admin') {
+            if (!req.canViewLessonDrafts) {
                 where.publicado = true;
             }
 
