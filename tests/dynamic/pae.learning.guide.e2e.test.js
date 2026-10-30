@@ -44,6 +44,7 @@ const jsonRequest = (route, method, body, token) => request(route, {
     headers: {
         'Content-Type': 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(route === '/learning/simulacro/submit' ? { 'Idempotency-Key': `qa-${body.simulacroId}-submit-v1` } : {}),
     },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
 });
