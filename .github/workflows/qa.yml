@@ -42,6 +42,7 @@ jobs:
       - run: npm run test:qa
       - run: npm run test:qa:security
       - run: node tests/qa/juan-integration.mjs
+      - run: node tests/qa/learning-regressions.mjs
       - run: npm run qa:coverage
         if: always()
       - run: npm run qa:host-coverage

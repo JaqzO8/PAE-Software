@@ -63,7 +63,8 @@ const record = (caseId, title, expected, actual, startedAt) => {
         durationMs: Date.now() - startedAt,
         expected,
         actual,
-        passed: true,
+        // Observations are recorded before assertions; the Jest result is the
+        // authority for pass/fail, including failures after this observation.
     };
     evidence.push(item);
     console.log(`[EVIDENCIA ${caseId}] ${JSON.stringify(item)}`);
