@@ -756,12 +756,7 @@ export const getUniversities = async (): Promise<University[]> => {
     return getUniversitiesMock();
   }
 
-  try {
-    return await getUniversitiesApi();
-  } catch (error) {
-    console.warn("🔴 API Error (Universities), using mock.", error);
-    return getUniversitiesMock();
-  }
+  return getUniversitiesApi();
 };
 
 export const startSimulacro = async (config: SimulacroConfig): Promise<SimulacroResult> => {
@@ -769,12 +764,7 @@ export const startSimulacro = async (config: SimulacroConfig): Promise<Simulacro
     return startSimulacroMock(config);
   }
 
-  try {
-    return await startSimulacroApi(config);
-  } catch (error) {
-    console.warn("🔴 API Error (Start Simulacro), using mock.", error);
-    return startSimulacroMock(config);
-  }
+  return startSimulacroApi(config);
 };
 
 export const submitSimulacro = async (submission: SimulacroSubmission): Promise<SimulacroScore> => {
@@ -798,8 +788,7 @@ export const submitSimulacro = async (submission: SimulacroSubmission): Promise<
         solutions: [],
       };
     }
-    console.warn("🔴 API Error (Submit Simulacro), using mock.", error);
-    return submitSimulacroMock(submission);
+    throw error;
   }
 };
 
@@ -846,12 +835,7 @@ export const getChallengeRooms = async (): Promise<ChallengeRoom[]> => {
     return getChallengeRoomsMock();
   }
 
-  try {
-    return await getChallengeRoomsApi();
-  } catch (error) {
-    console.warn("🔴 API Error (Challenge Rooms), using mock.", error);
-    return getChallengeRoomsMock();
-  }
+  return getChallengeRoomsApi();
 };
 
 export const createChallengeRoom = async (data: CreateRoomData): Promise<ChallengeRoom> => {
@@ -859,12 +843,7 @@ export const createChallengeRoom = async (data: CreateRoomData): Promise<Challen
     return createChallengeRoomMock(data);
   }
 
-  try {
-    return await createChallengeRoomApi(data);
-  } catch (error) {
-    console.warn("🔴 API Error (Create Challenge Room), using mock.", error);
-    return createChallengeRoomMock(data);
-  }
+  return createChallengeRoomApi(data);
 };
 
 export const joinChallengeRoom = async (roomId: string): Promise<ChallengeRoom> => {
@@ -900,12 +879,7 @@ export const getDailyTrivia = async (): Promise<TriviaQuestion[]> => {
     return getDailyTriviaMock();
   }
 
-  try {
-    return await getDailyTriviaApi();
-  } catch (error) {
-    console.warn("🔴 API Error (Daily Trivia), using mock.", error);
-    return getDailyTriviaMock();
-  }
+  return getDailyTriviaApi();
 };
 
 export const getTriviaRooms = async (): Promise<TriviaRoom[]> => {
@@ -913,12 +887,7 @@ export const getTriviaRooms = async (): Promise<TriviaRoom[]> => {
     return getTriviaRoomsMock();
   }
 
-  try {
-    return await getTriviaRoomsApi();
-  } catch (error) {
-    console.warn("🔴 API Error (Trivia Rooms), using mock.", error);
-    return getTriviaRoomsMock();
-  }
+  return getTriviaRoomsApi();
 };
 
 export const createTriviaRoom = async (data: CreateTriviaRoomData): Promise<TriviaRoom> => {
@@ -926,12 +895,7 @@ export const createTriviaRoom = async (data: CreateTriviaRoomData): Promise<Triv
     return createTriviaRoomMock(data);
   }
 
-  try {
-    return await createTriviaRoomApi(data);
-  } catch (error) {
-    console.warn("🔴 API Error (Create Trivia Room), using mock.", error);
-    return createTriviaRoomMock(data);
-  }
+  return createTriviaRoomApi(data);
 };
 
 export const joinTriviaRoom = async (roomId: string): Promise<TriviaRoom> => {

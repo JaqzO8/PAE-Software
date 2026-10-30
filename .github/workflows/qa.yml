@@ -42,6 +42,8 @@ jobs:
       - run: npm run test:qa
       - run: npm run test:qa:security
       - run: node tests/qa/juan-integration.mjs
+      - run: node tests/qa/learning-regressions.mjs
+      - run: node tests/qa/live-learning.mjs
       - run: npm run qa:coverage
         if: always()
       - run: npm run qa:host-coverage
@@ -59,12 +61,17 @@ jobs:
             coverage/qa/
             docs/estabilizacion/RESULTADOS_PRUEBAS.md
       - name: SonarQube analysis with coverage
-        if: success() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        # The organization's plan supports main and PR analysis, not branch gates.
+        # develop still runs the complete test/coverage matrix and is reviewed via PR.
+        if: success() && (github.ref == 'refs/heads/main' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository))
         uses: SonarSource/sonarqube-scan-action@d209202bc7d53ff1cc128f7f907dac145c9d6ae9 # v8
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN || secrets.PAESOFTK }}
         with:
           args: >-
             -Dsonar.qualitygate.wait=true
+      - name: Explain branch analysis availability
+        if: success() && github.event_name != 'pull_request' && github.ref != 'refs/heads/main'
+        run: echo "::notice::This Sonar organization does not support non-main branch gates. Tests and coverage ran; see PR and main analyses for Sonar results. No branch gate is claimed."
       - run: npm run qa:stop
         if: always()

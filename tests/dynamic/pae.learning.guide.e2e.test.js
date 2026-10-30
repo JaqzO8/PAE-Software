@@ -44,6 +44,7 @@ const jsonRequest = (route, method, body, token) => request(route, {
     headers: {
         'Content-Type': 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(route === '/learning/simulacro/submit' ? { 'Idempotency-Key': `qa-${body.simulacroId}-submit-v1` } : {}),
     },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
 });
@@ -63,7 +64,8 @@ const record = (caseId, title, expected, actual, startedAt) => {
         durationMs: Date.now() - startedAt,
         expected,
         actual,
-        passed: true,
+        // Observations are recorded before assertions; the Jest result is the
+        // authority for pass/fail, including failures after this observation.
     };
     evidence.push(item);
     console.log(`[EVIDENCIA ${caseId}] ${JSON.stringify(item)}`);
@@ -192,7 +194,11 @@ describe('Guia PAE - 12 casos de Aprendizaje y Evaluacion', () => {
     test('CP-AE-ROL-001 limita resultados al usuario autenticado', async () => {
         const startedAt = Date.now();
         const { response, body } = await jsonRequest('/learning/simulacro/results', 'GET', undefined, student.token);
-        const ownOnly = body.data?.every((attempt) => String(attempt.id_usuario) === String(student.user.id));
+        const other = await jsonRequest(`/learning/simulacro/results?userId=${student.user.id}`, 'GET', undefined, teacher.token);
+        expect(other.response.status).toBe(200);
+        const expectedIds = [String(fullAttempt.id), String(partialAttempt.id)];
+        const ownOnly = body.data?.length === 2 && body.data.every((attempt) => expectedIds.includes(String(attempt.id_intento)))
+            && other.body.data.every((attempt) => !expectedIds.includes(String(attempt.id_intento)));
         record('CP-AE-ROL-001', 'Permitir funciones propias al estudiante', 'Todos los intentos pertenecen al estudiante', `HTTP ${response.status}; intentos=${body.data?.length}; propios=${ownOnly}`, startedAt);
         expect(response.status).toBe(200);
         expect(ownOnly).toBe(true);
@@ -228,9 +234,16 @@ describe('Guia PAE - 12 casos de Aprendizaje y Evaluacion', () => {
         const startedAt = Date.now();
         const { response, body } = await jsonRequest('/learning/simulacro/results', 'GET', undefined, student.token);
         const persisted = body.data?.find((attempt) => String(attempt.id_intento) === String(fullAttempt.id));
-        record('CP-AE-SIS-001', 'Completar flujo integral de simulacro', 'Respuestas y resultado permanecen al reconsultar', `HTTP ${response.status}; estado=${persisted?.estado}; respuestas=${persisted?.respuestas?.length}; puntaje=${persisted?.puntaje}`, startedAt);
+        const replay = await jsonRequest('/learning/simulacro/submit', 'POST', {
+            simulacroId: fullAttempt.id,
+            answers: fullAttempt.questions.map(question => answerByQuestionId.get(question.id)),
+            timeSpent: 180,
+        }, student.token);
+        record('CP-AE-SIS-001', 'Completar flujo integral de simulacro', 'Resultado confirmado permanece al reconsultar y repetir envio', `HTTP ${response.status}; estado=${persisted?.estado}; correctas=${persisted?.correctas}; puntaje=${persisted?.puntaje}`, startedAt);
         expect(response.status).toBe(200);
-        expect(persisted.respuestas).toHaveLength(6);
+        expect(Number(persisted.correctas)).toBe(6);
+        expect(replay.response.status).toBe(200);
+        expect(replay.body).toEqual(fullResult);
         expect(Number(persisted.puntaje)).toBe(fullResult.score);
     });
 
