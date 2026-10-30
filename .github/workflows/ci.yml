@@ -40,6 +40,8 @@ jobs:
       - run: npm ci --ignore-scripts --prefix backend/services/learning-service
       - run: npm test --prefix backend/services/content-service -- --runInBand
       - run: npm test --prefix backend/services/quality-service
+      - run: npm run test:auth
+      - run: npm run test:m8
       - run: npm run test:exam
       - run: node scripts/verify-config.mjs
       - run: npm run check:architecture

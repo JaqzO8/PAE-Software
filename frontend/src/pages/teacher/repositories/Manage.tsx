@@ -18,6 +18,8 @@ interface Resource {
     url_externa?: string;
     descargas: number;
     fecha_subida: string;
+    publicado?: boolean;
+    estado_editorial?: "pendiente" | "aprobado" | "rechazado";
 }
 
 const ManageRepository = () => {
@@ -91,6 +93,21 @@ const ManageRepository = () => {
                 variant: "destructive",
                 title: "Error",
                 description: error.response?.data?.message || "No se pudo eliminar",
+            });
+        }
+    };
+
+    const handlePublishResource = async (resourceId: number) => {
+        try {
+            await api.post(`/content/resources/${resourceId}/editorial-review`, { estado: "aprobado" });
+            await api.post(`/content/resources/${resourceId}/publish`);
+            toast({ title: "Recurso publicado", description: "Ya está disponible para estudiantes autorizados." });
+            await loadResources();
+        } catch (error: any) {
+            toast({
+                variant: "destructive",
+                title: "No se pudo publicar",
+                description: error.response?.data?.message || "Revisa el recurso antes de publicar",
             });
         }
     };
@@ -258,6 +275,15 @@ const ManageRepository = () => {
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-2">
+                                    <Badge variant={resource.publicado ? "secondary" : "outline"}>
+                                        {resource.publicado ? "Publicado" : "Borrador"}
+                                    </Badge>
+                                    {!resource.publicado && <span className="text-xs text-muted-foreground">Editorial: {resource.estado_editorial || "pendiente"}</span>}
+                                    {!resource.publicado && (
+                                        <Button variant="outline" size="sm" onClick={() => handlePublishResource(resource.id_recurso)}>
+                                            Publicar
+                                        </Button>
+                                    )}
                                     {resource.url_externa && (
                                         <Button variant="outline" size="sm" asChild>
                                             <a href={resource.url_externa} target="_blank" rel="noopener noreferrer">

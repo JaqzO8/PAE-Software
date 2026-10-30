@@ -1,14 +1,14 @@
 const express = require('express');
 const router = express.Router();
 const ResourceController = require('../controllers/resourceController');
-const { verifyToken, isTeacher, isAuthenticated } = require('../middlewares/authMiddleware');
+const { verifyToken, verifyOptionalToken, isTeacher, isAuthenticated } = require('../middlewares/authMiddleware');
 const { uploadSingle } = require('../middlewares/uploadMiddleware');
 
 /**
  * GET /api/content/resources
  * Listar recursos de un repositorio
  */
-router.get('/', ResourceController.list);
+router.get('/', verifyOptionalToken, ResourceController.list);
 
 /**
  * POST /api/content/resources
@@ -22,6 +22,14 @@ router.post(
     ResourceController.create
 );
 
+router.post(
+    '/:id/publish',
+    verifyToken,
+    isTeacher,
+    ResourceController.publish
+);
+router.post('/:id/editorial-review', verifyToken, isTeacher, ResourceController.editorialReview);
+
 /**
  * GET /api/content/resources/:id/file
  * Descargar archivo local autenticado
@@ -29,7 +37,9 @@ router.post(
 router.get(
     '/:id/file',
     verifyToken,
-    isAuthenticated,
+    (req, res, next) => req.query.access_token
+        ? ResourceController.temporaryAccess(req, res, next)
+        : isAuthenticated(req, res, next),
     ResourceController.streamFile
 );
 
@@ -37,7 +47,7 @@ router.get(
  * GET /api/content/resources/:id
  * Obtener un recurso por ID
  */
-router.get('/:id', ResourceController.getById);
+router.get('/:id', verifyOptionalToken, ResourceController.getById);
 
 /**
  * POST /api/content/resources/:id/download

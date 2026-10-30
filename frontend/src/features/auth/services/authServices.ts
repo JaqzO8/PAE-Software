@@ -1,5 +1,8 @@
 // src/features/auth/services/authServices.ts
 import { api } from "../../../services/api";
+import { isAxiosError } from "axios";
+
+type AuthErrorResponse = { message?: string; errors?: { message: string }[] };
 
 // ========================================
 // INTERFACES ACTUALIZADAS
@@ -77,39 +80,31 @@ export const register = async (data: RegisterData): Promise<AuthResponse> => {
       password: data.password,
       isTeacher: data.isTeacher,
     };
-    
-    console.log('📤 Registro: Enviando datos al backend...', payload);
-    
+
+
+
     const response = await api.post<AuthResponse>("/auth/register", payload);
 
-    console.log('📥 Registro: Respuesta recibida:', {
-      hasUser: !!response.data?.user,
-      hasToken: !!response.data?.token,
-      rol: response.data?.user?.rol
-    });
+
 
     if (!response.data || !response.data.token) {
       throw new Error("Respuesta inválida del servidor");
     }
 
     return response.data;
-  } catch (error: any) {
-    console.error('❌ Error en registro:', {
-      status: error.response?.status,
-      data: error.response?.data,
-      message: error.message
-    });
-    
+  } catch (error) {
+    if (!isAxiosError<AuthErrorResponse>(error)) throw error;
+
     if (error.response?.status === 409) {
       throw new Error("Este correo ya está registrado");
     }
     if (error.response?.status === 400) {
-      const errorMsg = error.response.data?.errors 
-        ? error.response.data.errors.map((e: any) => e.message).join(', ')
+      const errorMsg = error.response.data?.errors
+        ? error.response.data.errors.map(e => e.message).join(', ')
         : error.response.data?.message || "Datos de registro inválidos";
       throw new Error(errorMsg);
     }
-    
+
     throw new Error("No se pudo crear la cuenta. Por favor intenta nuevamente.");
   }
 };
@@ -120,38 +115,30 @@ export const register = async (data: RegisterData): Promise<AuthResponse> => {
  */
 export const login = async (credentials: LoginCredentials): Promise<AuthResponse> => {
   try {
-    console.log('📤 Login: Enviando credenciales al backend...');
-    
+
     const response = await api.post<AuthResponse>("/auth/login", {
       email: credentials.email.toLowerCase(),
       password: credentials.password,
     });
 
-    console.log('📥 Login: Respuesta del servidor:', {
-      success: !!response.data,
-      hasUser: !!response.data?.user,
-      hasToken: !!response.data?.token,
-      userEmail: response.data?.user?.email,
-      userRole: response.data?.user?.rol,
-      userName: `${response.data?.user?.nombres} ${response.data?.user?.apellidos}`
-    });
+
 
     if (!response.data || !response.data.token || !response.data.user) {
-      console.error('❌ Respuesta inválida del servidor:', response.data);
+
       throw new Error("Respuesta inválida del servidor");
     }
 
     if (!['estudiante', 'docente', 'admin'].includes(response.data.user.rol)) {
-      console.error('❌ Rol inválido recibido:', response.data.user.rol);
+
       throw new Error("Rol de usuario inválido");
     }
 
-    console.log('✅ Login exitoso para:', response.data.user.email, 'con rol:', response.data.user.rol);
+
 
     return response.data;
-  } catch (error: any) {
-    console.error('❌ Error en login:', error.response?.data || error.message);
-    
+  } catch (error) {
+    if (!isAxiosError<AuthErrorResponse>(error)) throw error;
+
     if (error.response?.status === 401) {
       throw new Error("Credenciales incorrectas");
     }
@@ -161,7 +148,7 @@ export const login = async (credentials: LoginCredentials): Promise<AuthResponse
     if (error.response?.status === 403) {
       throw new Error("Cuenta desactivada. Contacta al administrador.");
     }
-    
+
     throw new Error("Error al iniciar sesión. Verifica tus credenciales.");
   }
 };
@@ -182,15 +169,12 @@ export const quickLogin = async (email: string): Promise<AuthResponse> => {
  */
 export const updateProfile = async (data: UpdateProfileData): Promise<AuthUser> => {
   try {
-    console.log('📤 Actualizando perfil...');
-    
+
     const response = await api.put<{ user: AuthUser }>("/auth/profile", data);
 
-    console.log('✅ Perfil actualizado:', response.data.user);
-    
+
     return response.data.user;
-  } catch (error: any) {
-    console.error('❌ Error actualizando perfil:', error);
+  } catch {
     throw new Error("No se pudo actualizar el perfil");
   }
 };
@@ -201,15 +185,12 @@ export const updateProfile = async (data: UpdateProfileData): Promise<AuthUser> 
  */
 export const updatePassword = async (data: UpdatePasswordData): Promise<{ shouldLogout: boolean }> => {
   try {
-    console.log('📤 Cambiando contraseña...');
-    
+
     const response = await api.put<{ shouldLogout: boolean }>("/auth/password", data);
 
-    console.log('✅ Contraseña actualizada');
-    
+
     return response.data;
-  } catch (error: any) {
-    console.error('❌ Error cambiando contraseña:', error);
+  } catch {
     throw new Error("No se pudo cambiar la contraseña");
   }
 };
@@ -250,9 +231,9 @@ export const verifyTwoFactor = async (code: string) => {
 export const logout = async (): Promise<void> => {
   try {
     await api.post("/auth/logout");
-    console.log('✅ Logout exitoso en el servidor');
-  } catch (error) {
-    console.error("Error al cerrar sesión en el servidor:", error);
+
+  } catch {
+    // The caller clears local state even if the remote session service is unavailable.
   }
 };
 
@@ -263,10 +244,9 @@ export const logout = async (): Promise<void> => {
 export const verifyToken = async (): Promise<{ valid: boolean; user?: AuthUser }> => {
   try {
     const response = await api.get<{ valid: boolean; user: AuthUser }>("/auth/verify");
-    console.log('✅ Token verificado:', response.data.valid);
+
     return response.data;
-  } catch (error) {
-    console.error("Error al verificar token:", error);
+  } catch {
     return { valid: false };
   }
 };
@@ -278,10 +258,9 @@ export const verifyToken = async (): Promise<{ valid: boolean; user?: AuthUser }
 export const refreshToken = async (): Promise<string> => {
   try {
     const response = await api.post<{ token: string }>("/auth/refresh");
-    console.log('✅ Token refrescado exitosamente');
+
     return response.data.token;
-  } catch (error) {
-    console.error("Error al refrescar token:", error);
+  } catch {
     throw new Error("Sesión expirada. Por favor inicia sesión nuevamente.");
   }
 };

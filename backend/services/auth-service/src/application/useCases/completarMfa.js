@@ -51,7 +51,7 @@ async function completarMfa({
     }
 
     const user = await userRepository.findById(challenge.userId);
-    if (!user || !user.activo) {
+    if (!user?.activo) {
         const error = new Error('Usuario no disponible');
         error.statusCode = 403;
         throw error;

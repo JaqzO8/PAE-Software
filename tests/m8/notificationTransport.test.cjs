@@ -37,8 +37,8 @@ test('RIC-14: sanitizeNotificationPayload elimina contraseñas, tokens y OTPs de
     assert.equal(sanitized.nested.comment, 'Buen progreso');
 });
 
-test('RIC-14: sendNotification entrega con éxito y devuelve estado enviado con ID único', async () => {
-    const transport = new NotificationTransport();
+test('RIC-14: adaptador confirma entrega y devuelve estado enviado con ID único', async () => {
+    const transport = new NotificationTransport({ sendAdapter: async () => ({ delivered: true, providerId: 'test-provider' }) });
     const result = await transport.sendNotification({
         idempotencyKey: 'msg_event_001',
         recipient: 'estudiante@test.edu',
@@ -56,6 +56,14 @@ test('RIC-14: sendNotification entrega con éxito y devuelve estado enviado con 
     assert.equal(result.deduplicated, false);
     assert.equal(result.sanitizedPayload.token, undefined);
     assert.equal(result.sanitizedPayload.title, 'Guía de derivadas');
+});
+
+test('RIC-14: sin proveedor no se inventa una entrega exitosa', async () => {
+    const result = await new NotificationTransport().sendNotification({
+        idempotencyKey: 'unconfigured', recipient: 'qa@example.test', templateId: 'TEST',
+    });
+    assert.equal(result.status, 'fallido');
+    assert.match(result.error, /no configurado/);
 });
 
 test('RIC-14: reintento con la misma clave de idempotencia devuelve registro previo sin duplicar', async () => {

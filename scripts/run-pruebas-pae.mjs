@@ -1,3 +1,5 @@
+import { dockerExecutable } from './lib/docker-executable.mjs';
+const docker = dockerExecutable();
 import { execFileSync, spawnSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { existsSync, writeFileSync } from 'node:fs';
@@ -5,7 +7,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const info = JSON.parse(execFileSync('docker', ['inspect', 'pae-community-service'], { encoding: 'utf8' }))[0];
+const info = JSON.parse(execFileSync(docker, ['inspect', 'pae-community-service'], { encoding: 'utf8' }))[0];
 const labels = info.Config.Labels;
 if (labels?.['com.docker.compose.project'] !== 'pruebas_pae') throw new Error('Expected the pruebas_pae project');
 const original = labels['com.docker.compose.project.working_dir'];
@@ -20,6 +22,6 @@ args.push('-f', path.join(root, 'docker-compose.architecture.yml'));
 const env = { ...process.env, PAE_SOURCE_ROOT: root.replaceAll('\\', '/') };
 const commands = process.argv.slice(2);
 if (!commands.length) commands.push('up', '-d', '--build', '--no-deps', 'auth-service', 'content-service', 'exam-service', 'community-service', 'frontend');
-const result = spawnSync('docker', [...args, ...commands], { env, stdio: 'inherit' });
+const result = spawnSync(docker, [...args, ...commands], { env, stdio: 'inherit' });
 if (result.error) throw result.error;
 process.exitCode = result.status ?? 1;
