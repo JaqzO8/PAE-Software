@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Loader2 } from "lucide-react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 
 import {
   Button,
@@ -18,7 +18,7 @@ import {
 
 import { useAuth } from "../../../context/AuthContext";
 import { useToast } from "../../../hooks/useToast";
-import { quickLogin, requestPasswordReset } from "../services/authServices";
+import { requestPasswordReset } from "../services/authServices";
 import styles from "./auth.module.css";
 
 const formSchema = z.object({
@@ -27,13 +27,11 @@ const formSchema = z.object({
 });
 
 export function LoginForm() {
-  const { login, isLoading, setAuthData } = useAuth();
+  const { login, isLoading } = useAuth();
   const location = useLocation();
-  const navigate = useNavigate();
   const { toast } = useToast();
   const [isRecoveryOpen, setIsRecoveryOpen] = useState(false);
   const [resetEmail, setResetEmail] = useState("");
-  const [isQuickLoading, setIsQuickLoading] = useState(false);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -54,25 +52,6 @@ export function LoginForm() {
       await login(values.email, values.password);
     } catch (error) {
       console.error("Error en login:", error);
-    }
-  }
-
-  async function handleQuickLogin() {
-    const email = form.getValues("email") || "demo.estudiante@pae.edu";
-    setIsQuickLoading(true);
-    try {
-      const response = await quickLogin(email);
-      setAuthData(response.user, response.token);
-      toast({ title: "Login rapido activo", description: "Ingresaste con el flujo social de prueba." });
-      navigate(response.user.rol === "docente" ? "/docente" : "/estudiante", { replace: true });
-    } catch (error: any) {
-      toast({
-        variant: "destructive",
-        title: "No se pudo iniciar rapido",
-        description: error.message || "Intenta nuevamente.",
-      });
-    } finally {
-      setIsQuickLoading(false);
     }
   }
 
@@ -158,9 +137,7 @@ export function LoginForm() {
           </div>
         )}
 
-        <Button type="button" variant="outline" className="w-full" onClick={handleQuickLogin} disabled={isQuickLoading}>
-          {isQuickLoading ? "Conectando..." : "Login rapido con Google"}
-        </Button>
+        <p className="text-sm text-neutral-600">Acceso con correo y contraseña. El acceso social está pendiente de configurar.</p>
       </form>
     </Form>
   );

@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:pae:event:LeccionCompletada:v1",
+  "title": "LeccionCompletada.v1 — Finalización confirmada de lección por un estudiante",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["eventId", "type", "schemaVersion", "producer", "occurredAt", "correlationId", "data"],
+  "properties": {
+    "eventId": { "type": "string", "format": "uuid" },
+    "type": { "const": "LeccionCompletada.v1" },
+    "schemaVersion": { "const": 1 },
+    "producer": { "const": "content" },
+    "occurredAt": { "type": "string", "format": "date-time", "pattern": "Z$" },
+    "correlationId": { "type": "string", "format": "uuid" },
+    "data": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["lessonId", "repositoryId", "userId", "completedAt"],
+      "properties": {
+        "lessonId": { "type": "string", "pattern": "^[1-9][0-9]{0,18}$" },
+        "repositoryId": { "type": "string", "pattern": "^[1-9][0-9]{0,18}$" },
+        "userId": { "type": "string", "pattern": "^[1-9][0-9]{0,18}$" },
+        "completedAt": { "type": "string", "format": "date-time", "pattern": "Z$" }
+      }
+    }
+  }
+}

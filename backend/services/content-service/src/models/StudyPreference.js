@@ -37,6 +37,11 @@ const StudyPreference = sequelize.define('study_preferences', {
         allowNull: false,
         defaultValue: true,
     },
+    zona_horaria: {
+        type: DataTypes.STRING(64),
+        allowNull: false,
+        defaultValue: 'America/Lima',
+    },
 }, {
     tableName: 'study_preferences',
     timestamps: true,

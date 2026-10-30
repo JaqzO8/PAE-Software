@@ -1,3 +1,5 @@
+import { dockerExecutable } from './lib/docker-executable.mjs';
+const docker = dockerExecutable();
 import assert from 'node:assert/strict';
 import { randomUUID, randomBytes } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
@@ -6,7 +8,7 @@ import path from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const inspect = JSON.parse(execFileSync('docker', ['inspect', 'pae-community-service'], { encoding: 'utf8' }))[0];
+const inspect = JSON.parse(execFileSync(docker, ['inspect', 'pae-community-service'], { encoding: 'utf8' }))[0];
 assert.equal(inspect.Config.Labels['com.docker.compose.project'], 'pruebas_pae');
 const origin = 'http://localhost:5173';
 const runId = randomUUID();
@@ -103,6 +105,6 @@ try {
         assert.ok(emails.every(email => email.startsWith(`qa.${runId}.`) && email.endsWith('@example.test')));
         const cleanup = `const { Usuario } = require('./src/models'); const { sequelize } = require('./src/config/database');
             Usuario.update({activo:false}, {where:{email:${JSON.stringify(emails)}}}).then(()=>sequelize.close()).catch(()=>{process.exitCode=1;});`;
-        execFileSync('docker', ['exec', '-i', 'pae-auth-service', 'node'], { input: cleanup, stdio: ['pipe', 'pipe', 'pipe'] });
+        execFileSync(docker, ['exec', '-i', 'pae-auth-service', 'node'], { input: cleanup, stdio: ['pipe', 'pipe', 'pipe'] });
     }
 }

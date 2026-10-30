@@ -7,8 +7,8 @@ function validateConfirmedResult(event) {
     if (typeof event.occurredAt !== 'string' || !/^\d{4}-\d{2}-\d{2}T.*Z$/.test(event.occurredAt) || !Number.isFinite(Date.parse(event.occurredAt))) throw new Error('Invalid event time');
     const data = event.data;
     if (!data || !id(data.attemptId) || !id(data.userId) || data.resultVersion !== 1 || data.status !== 'confirmed') throw new Error('Only first confirmed result versions are supported; revisions require a compensation policy');
-    const allowed = ['attemptId', 'userId', 'resultVersion', 'status'];
-    if (Object.keys(data).some(key => !allowed.includes(key))) throw new Error('Unexpected result data');
+    const allowed = new Set(['attemptId', 'userId', 'resultVersion', 'status']);
+    if (Object.keys(data).some(key => !allowed.has(key))) throw new Error('Unexpected result data');
     if (Object.keys(event).some(key => !['eventId', 'type', 'schemaVersion', 'producer', 'occurredAt', 'correlationId', 'data'].includes(key))) throw new Error('Unexpected event field');
     return event;
 }

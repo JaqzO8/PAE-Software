@@ -1,120 +1,68 @@
-const test = require('node:test');
+const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const jwt = require('../../backend/services/auth-service/node_modules/jsonwebtoken');
-
-// TokenService del auth-service
+const http = require('node:http');
+process.env.NODE_ENV = 'test';
 const TokenService = require('../../backend/services/auth-service/src/services/tokenService');
-const { inMemoryFallback } = require('../../backend/services/auth-service/src/config/redis');
-
-// Middlewares de los servicios consumidores
-const authServiceMiddleware = require('../../backend/services/auth-service/src/middlewares/authMiddleware');
-const communityServiceMiddleware = require('../../backend/services/community-service/src/middlewares/authMiddleware');
-const contentServiceMiddleware = require('../../backend/services/content-service/src/middlewares/authMiddleware');
-const examServiceMiddleware = require('../../backend/services/exam-service/src/middlewares/authMiddleware');
-
-test('RIC-11 / RIC-AC-04: token revocado en auth-service es rechazado en auth-service y servicios consumidores', async () => {
-    const payload = { id_usuario: 88, id: 88, email: 'estudiante@pae.edu', rol: 'estudiante' };
-    const token = TokenService.generateToken(payload);
-
-    // 1. Antes de revocar: token válido en authServiceMiddleware
-    let authReq = { headers: { authorization: `Bearer ${token}` } };
-    let authRes = {
-        status: (code) => ({ json: (body) => ({ code, body }) }),
-    };
-    let authNextCalled = false;
-    await authServiceMiddleware.verifyToken(authReq, authRes, () => {
-        authNextCalled = true;
+const models = require('../../backend/services/auth-service/src/models');
+const authMiddleware = require('../../backend/services/auth-service/src/middlewares/authMiddleware');
+const consumers = ['content','exam','quality'].map(name => require('../../backend/services/' + name + '-service/src/middlewares/authMiddleware'));
+function response() { const result = { code: 200, body: null }; result.status = code => { result.code=code; return result; }; result.json = body => { result.body=body; return result; }; return result; }
+test('RIC-11: consumidores consultan autoridad HTTP y respetan revocación sin inyectar cachés locales', async t => {
+    t.mock.method(models.Usuario,'findByPk',async()=>({ activo:true, rol:{ nombre_rol:'estudiante' } }));
+    t.mock.method(models.Sesion,'findOne',async()=>({ activa:true }));
+    const user={id:88,rol:'estudiante'};
+    const token=TokenService.generateToken(user);
+    const server=http.createServer(async(req,res)=>{
+        const result=await TokenService.verifyToken(req.headers.authorization.slice(7));
+        res.writeHead(result.valid?200:401,{'Content-Type':'application/json'});
+        res.end(JSON.stringify(result.valid?{valid:true,user:{...user,activo:true}}:{valid:false}));
     });
-    assert.equal(authNextCalled, true, 'Token activo debe ser aceptado en auth-service');
-
-    // 2. Revocación a través de TokenService (agrega a blacklist)
-    const revoked = await TokenService.revokeToken(token);
-    assert.equal(revoked, true);
-
-    // 3. Comprobación en auth-service: debe rechazar con 401
-    let authRejected = false;
-    let authStatusCode = null;
-    let authResponseBody = null;
-    const mockResAuth = {
-        status: (code) => {
-            authStatusCode = code;
-            return {
-                json: (body) => {
-                    authResponseBody = body;
-                    authRejected = true;
-                },
-            };
-        },
-    };
-    await authServiceMiddleware.verifyToken(authReq, mockResAuth, () => {});
-    assert.equal(authRejected, true);
-    assert.equal(authStatusCode, 401);
-    assert.match(authResponseBody.message, /revocado/i);
-
-    // 4. Comprobación en exam-service (simulando cache de revocación distribuida)
-    examServiceMiddleware.localRevocationCache.add(token);
-    let examRejected = false;
-    let examStatusCode = null;
-    const mockResExam = {
-        status: (code) => {
-            examStatusCode = code;
-            return {
-                json: (body) => {
-                    examRejected = true;
-                },
-            };
-        },
-    };
-    examServiceMiddleware.verifyToken({ headers: { authorization: `Bearer ${token}` } }, mockResExam, () => {});
-    assert.equal(examRejected, true);
-    assert.equal(examStatusCode, 401);
-
-    // 5. Comprobación en content-service
-    contentServiceMiddleware.localRevocationCache.add(token);
-    let contentRejected = false;
-    let contentStatusCode = null;
-    const mockResContent = {
-        status: (code) => {
-            contentStatusCode = code;
-            return {
-                json: (body) => {
-                    contentRejected = true;
-                },
-            };
-        },
-    };
-    contentServiceMiddleware.verifyToken({ headers: { authorization: `Bearer ${token}` } }, mockResContent, () => {});
-    assert.equal(contentRejected, true);
-    assert.equal(contentStatusCode, 401);
+    await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+    const previous=process.env.AUTH_SERVICE_URL;
+    process.env.AUTH_SERVICE_URL='http://127.0.0.1:'+server.address().port;
+    try {
+        for(const middleware of [authMiddleware,...consumers]) {
+            let next=false; await middleware.verifyToken({headers:{authorization:'Bearer '+token}},response(),()=>{next=true;});
+            assert.equal(next,true);
+        }
+        assert.equal(await TokenService.revokeToken(token),true);
+        for(const middleware of [authMiddleware,...consumers]) {
+            const res=response(); await middleware.verifyToken({headers:{authorization:'Bearer '+token}},res,()=>assert.fail('Token revocado aceptado'));
+            assert.equal(res.code,401);
+        }
+    } finally { if(previous===undefined)delete process.env.AUTH_SERVICE_URL;else process.env.AUTH_SERVICE_URL=previous; await new Promise(resolve=>server.close(resolve)); }
+});
+test('RIC-AC-02: credenciales MFA restringidas no sirven como sesión de negocio', async()=>{
+    const token=TokenService.generateChallengeToken({id:99});
+    for(const middleware of [authMiddleware,...consumers]) {
+        const res=response();await middleware.verifyToken({headers:{authorization:'Bearer '+token}},res,()=>assert.fail('MFA aceptado como sesión'));
+        assert.equal(res.code,401);
+    }
+});
+test('RIC-11: autoridad no disponible falla cerrado en servicios consumidores', async()=>{
+    const token=TokenService.generateToken({id:88,rol:'estudiante'}),previous=process.env.AUTH_SERVICE_URL;
+    process.env.AUTH_SERVICE_URL='http://127.0.0.1:1';
+    try { for(const middleware of consumers) { const res=response();await middleware.verifyToken({headers:{authorization:'Bearer '+token}},res,()=>assert.fail('Fallo abierto'));assert.equal(res.code,503); } }
+    finally { if(previous===undefined)delete process.env.AUTH_SERVICE_URL;else process.env.AUTH_SERVICE_URL=previous; }
 });
 
-test('RIC-AC-02 / RIC-06: tokens de alcance restringido (mfa_challenge) son rechazados por todos los servicios de negocio', async () => {
-    const challengeToken = TokenService.generateChallengeToken({ id_usuario: 99, email: 'reto@pae.edu' });
-
-    // En auth-service normal
-    let authCode = 0;
-    await authServiceMiddleware.verifyToken(
-        { headers: { authorization: `Bearer ${challengeToken}` } },
-        { status: (c) => ({ json: () => { authCode = c; } }) },
-        () => {}
-    );
-    assert.equal(authCode, 401);
-
-    // En content-service
-    let contentCode = 0;
-    await contentServiceMiddleware.verifyToken(
-        { headers: { authorization: `Bearer ${challengeToken}` } },
-        { status: (c) => ({ json: () => { contentCode = c; } }) },
-        () => {}
-    );
-    assert.equal(contentCode, 401);
-
-    // En exam-service
-    let examCode = 0;
-    await examServiceMiddleware.verifyToken(
-        { headers: { authorization: `Bearer ${challengeToken}` } },
-        { status: (c) => ({ json: () => { examCode = c; } }) },
-        () => {}
-    );
-    assert.equal(examCode, 401);
+test('Identity credentials require HTTPS in production and missing configuration fails closed', async t => {
+    const learning = require('../../backend/services/learning-service/src/middlewares/jwtAuth');
+    const token = TokenService.generateToken({ id: 88, rol: 'estudiante' });
+    const previousUrl = process.env.AUTH_SERVICE_URL, previousMode = process.env.NODE_ENV;
+    t.mock.method(globalThis, 'fetch', async () => assert.fail('Insecure request transmitted'));
+    try {
+        process.env.NODE_ENV = 'production';
+        for (const url of ['http://identity.example.test', 'ftp://identity.example.test', '']) {
+            process.env.AUTH_SERVICE_URL = url;
+            for (const handler of [...consumers.map(item => item.verifyToken), learning.authenticate]) {
+                const res = response();
+                await handler({ headers: { authorization: 'Bearer ' + token } }, res, () => assert.fail('Insecure identity accepted'));
+                assert.equal(res.code, 503);
+            }
+        }
+    } finally {
+        process.env.NODE_ENV = previousMode;
+        if (previousUrl === undefined) delete process.env.AUTH_SERVICE_URL; else process.env.AUTH_SERVICE_URL = previousUrl;
+    }
 });

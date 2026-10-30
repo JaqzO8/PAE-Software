@@ -274,7 +274,7 @@ const Desafios = () => {
             </div>
             <div>
               <p className="text-3xl font-bold text-purple-600 mb-2">
-                +{Math.floor(Math.random() * 50 + 100)}
+                No disponible
               </p>
               <p className="text-sm text-muted-foreground">
                 Desafíos completados hoy

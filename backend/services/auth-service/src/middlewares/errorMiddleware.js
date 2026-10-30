@@ -2,7 +2,7 @@
  * Middleware global de manejo de errores
  */
 const errorHandler = (err, req, res, next) => {
-    console.error('❌ Error:', err);
+    console.error('Auth request failed', { name: err.name, code: err.original?.code });
 
     // Error de validación de Sequelize
     if (err.name === 'SequelizeValidationError') {
@@ -26,9 +26,10 @@ const errorHandler = (err, req, res, next) => {
     }
 
     // Error por defecto
-    res.status(err.status || 500).json({
+    const status = err.status || err.statusCode || 500;
+    res.status(status).json({
         success: false,
-        message: err.message || 'Error interno del servidor',
+        message: status >= 500 ? 'Servicio temporalmente no disponible' : err.message || 'Solicitud inválida',
     });
 };
 

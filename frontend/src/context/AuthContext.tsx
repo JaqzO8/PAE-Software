@@ -3,6 +3,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '../hooks/useToast';
 import * as authService from '../features/auth/services/authServices';
+import { clearOfflineLessons } from '../features/lessons/services/offlineLessonStore';
 
 // ========================================
 // INTERFACES
@@ -49,6 +50,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const navigate = useNavigate();
   const { toast } = useToast();
 
+  const clearAuthData = useCallback(() => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    localStorage.removeItem('role');
+    setUser(null);
+    setToken(null);
+  }, []);
+
   // ========================================
   // INICIALIZACIÓN: Cargar sesión guardada
   // ========================================
@@ -61,7 +70,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         try {
           // Verificar que el token sigue siendo válido
           const verification = await authService.verifyToken();
-          
+
           if (verification.valid && verification.user) {
             setToken(storedToken);
             setUser(verification.user);
@@ -71,8 +80,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             // Token inválido, limpiar storage
             clearAuthData();
           }
-        } catch (error) {
-          console.error('Error al verificar sesión:', error);
+        } catch {
+
           clearAuthData();
         }
       }
@@ -80,18 +89,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     initAuth();
-  }, []);
+  }, [clearAuthData]);
 
   // ========================================
   // HELPER: Limpiar datos de autenticación
   // ========================================
-  const clearAuthData = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    localStorage.removeItem('role');
-    setUser(null);
-    setToken(null);
-  };
+
 
   // ========================================
   // Establecer datos de autenticación
@@ -110,15 +113,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = useCallback(async (email: string, password: string) => {
     setIsLoading(true);
     try {
-      console.log('🔵 AuthContext: Iniciando login...');
+
       const response = await authService.login({ email, password });
-      
-      console.log('✅ AuthContext: Respuesta recibida:', {
-        nombres: response.user.nombres,
-        apellidos: response.user.apellidos,
-        rol: response.user.rol,
-        email: response.user.email
-      });
+
 
       // Guardar en estado y localStorage
       setUser(response.user);
@@ -127,44 +124,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.setItem('user', JSON.stringify(response.user));
       localStorage.setItem('role', response.user.rol);
 
-      console.log('💾 AuthContext: Datos guardados en localStorage');
+
 
       // Toast de bienvenida
       toast({
-        title: response.user.primer_ingreso 
-          ? '¡Bienvenido por primera vez!' 
+        title: response.user.primer_ingreso
+          ? '¡Bienvenido por primera vez!'
           : '¡Bienvenido de nuevo!',
         description: `${response.user.nombres} ${response.user.apellidos} - ${response.user.rol}`,
       });
 
       // Redirigir según rol
       const basePath = response.user.rol === 'docente' ? '/docente' : '/estudiante';
-      
-      console.log('🚀 AuthContext: Redirigiendo a:', basePath);
-      
+
       setTimeout(() => {
         try {
           navigate(basePath, { replace: true });
-          console.log('✅ Navigate ejecutado');
-          
+
           setTimeout(() => {
             if (window.location.pathname !== basePath) {
-              console.warn('⚠️ Navigate no funcionó, usando window.location');
+
               window.location.href = basePath;
             }
           }, 300);
-        } catch (error) {
-          console.error('❌ Error en navigate, usando window.location:', error);
+        } catch {
+
           window.location.href = basePath;
         }
       }, 100);
 
-    } catch (error: any) {
-      console.error('❌ AuthContext: Error en login:', error);
+    } catch (error) {
+
       toast({
         variant: 'destructive',
         title: 'Error de acceso',
-        description: error.message || 'No se pudo iniciar sesión',
+        description: error instanceof Error ? error.message : 'No se pudo iniciar sesión',
       });
       throw error;
     } finally {
@@ -179,10 +173,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       // Intentar cerrar sesión en el servidor
       await authService.logout();
-    } catch (error) {
-      console.error('Error al cerrar sesión en servidor:', error);
+    } catch {
+      // Local cleanup also applies when the remote service is unavailable.
     } finally {
       // Limpiar siempre localmente, aunque falle el servidor
+      if (user?.id) clearOfflineLessons(String(user.id));
       clearAuthData();
 
       toast({
@@ -192,7 +187,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       navigate('/', { replace: true });
     }
-  }, [navigate, toast]);
+  }, [navigate, toast, user?.id, clearAuthData]);
 
   // ========================================
   // ACTUALIZAR USUARIO
@@ -214,8 +209,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const newToken = await authService.refreshToken();
       setToken(newToken);
       localStorage.setItem('token', newToken);
-    } catch (error) {
-      console.error('Error al refrescar sesión:', error);
+    } catch {
+
       // Si falla el refresh, cerrar sesión
       await logout();
     }

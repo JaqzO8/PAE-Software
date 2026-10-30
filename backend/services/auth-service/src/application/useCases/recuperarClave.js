@@ -18,7 +18,7 @@ async function solicitarRecuperacion({
 
     if (normalizedEmail) {
         const user = await userRepository.findByEmail(normalizedEmail);
-        if (user && user.activo) {
+        if (user?.activo) {
             resetToken = cryptoProvider.randomHex(32);
             await tokenStorage.setResetToken(
                 resetToken,

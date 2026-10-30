@@ -1,5 +1,5 @@
-const path = require('path');
-const fs = require('fs');
+const path = require('node:path');
+const fs = require('node:fs');
 require('dotenv').config();
 
 const parseNumber = (value, fallback) => {
@@ -24,6 +24,9 @@ const config = {
     // Auth Service (para validar tokens)
     AUTH_SERVICE_URL: process.env.AUTH_SERVICE_URL || 'http://auth-service:3001',
     JWT_SECRET: process.env.JWT_SECRET || '',
+    OUTBOX_TRANSPORT_URL: process.env.OUTBOX_TRANSPORT_URL || '',
+    OUTBOX_POLL_MS: parseNumber(process.env.OUTBOX_POLL_MS, 5000),
+    RESOURCE_LINK_TTL_SECONDS: parseNumber(process.env.RESOURCE_LINK_TTL_SECONDS, 900),
     
     // File Upload
     UPLOAD_PATH: process.env.UPLOAD_PATH || (fs.existsSync('/app') ? '/app/uploads' : path.join(__dirname, '../../uploads')),
