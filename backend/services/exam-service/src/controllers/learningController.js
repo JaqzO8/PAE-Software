@@ -1384,6 +1384,9 @@ class LearningController {
             if (!room) {
                 return res.status(404).json({ success: false, message: 'Sala no encontrada' });
             }
+            if (!userIsParticipant(room, req.user.id)) {
+                return res.status(403).json({ success: false, message: 'No perteneces a esta sala' });
+            }
 
             const match = await ChallengeMatch.findOne({
                 where: { id_sala: room.id_sala },
@@ -1740,6 +1743,9 @@ class LearningController {
             const room = await TriviaRoom.findByPk(req.params.id);
             if (!room) {
                 return res.status(404).json({ success: false, message: 'Sala no encontrada' });
+            }
+            if (!userIsParticipant(room, req.user.id)) {
+                return res.status(403).json({ success: false, message: 'No perteneces a esta sala' });
             }
 
             const match = await TriviaMatch.findOne({
