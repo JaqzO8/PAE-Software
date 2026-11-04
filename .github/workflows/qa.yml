@@ -45,6 +45,8 @@ jobs:
       - run: node tests/qa/juan-integration.mjs
       - run: node tests/qa/learning-regressions.mjs
       - run: node tests/qa/live-learning.mjs
+      - run: node tests/qa/content-lifecycle.mjs
+      - run: node tests/qa/auth-lifecycle.mjs
       - run: node tests/qa/browser-modules.mjs
       - run: node scripts/browser-coverage.mjs
         if: always()
