@@ -48,6 +48,7 @@ jobs:
       - run: node tests/qa/content-lifecycle.mjs
       - run: node tests/qa/auth-lifecycle.mjs
       - run: node tests/qa/browser-modules.mjs
+      - run: node tests/qa/browser-exam.mjs
       - run: node scripts/browser-coverage.mjs
         if: always()
       - run: npm run qa:coverage

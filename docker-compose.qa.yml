@@ -77,7 +77,9 @@ services:
     ports: ['127.0.0.1:13000:3000']
     depends_on: [auth-service, community-service, exam-service, content-service, quality-service, learning-service]
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      args: { PAE_BROWSER_COVERAGE: '1' }
     ports: ['127.0.0.1:15173:5173']
     depends_on: [nginx-gateway]
 volumes:

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { account, request, compose, sql } from './harness.mjs';
+import { expect } from '@playwright/test';
+import { account, request, compose, sql, browserPage, origin } from './harness.mjs';
 
 assert.equal(JSON.parse(compose('config', '--format', 'json')).name, 'pae_qa');
 const teacher = await account('docente'), otherTeacher = await account('docente');
@@ -36,7 +37,7 @@ console.log('PASS CONTENT lifecycle: repository ownership, favorites and transac
 
 const lessonData = { id_repositorio: repo.id_repositorio, titulo: 'QA ecuaciones', descripcion: 'Práctica guiada',
     contenido: 'Resolver x + 2 = 5.', resumen_teorico: 'Restar dos a ambos lados.',
-    preguntas_respuestas: [{ pregunta: 'Valor de x', respuesta: '3' }], mapa_conceptual: [{ titulo: 'Igualdad' }],
+    preguntas_respuestas: [{ pregunta: 'Valor de x', respuesta: '3' }], mapa_conceptual: [{ concepto: 'Igualdad' }],
     recursos_multimedia: [], duracion_minutos: 10, publicado: true };
 await request('/content/lessons', { method: 'POST', account: student, data: lessonData, status: 403 });
 await request('/content/lessons', { method: 'POST', account: teacher, data: {}, status: 400 });
@@ -61,6 +62,27 @@ const material = await request(`${route}/material`, { account: student });
 assert.match(material.headers.get('content-type'), /application\/pdf/); assert.match(material.body, /^%PDF/);
 await request(`${route}/summary`, { account: otherStudent, status: 403 });
 console.log('PASS CONTENT lifecycle: lessons, monotonic progress, single completion event and protected learning material');
+
+const { browser, page } = await browserPage(student);
+try {
+    await page.goto(`${origin}/estudiante/repositorios/${repo.id_repositorio}`);
+    await expect(page.getByRole('heading', { name: repo.titulo, exact: true })).toBeVisible();
+    await page.goto(`${origin}/estudiante/repositorios/${repo.id_repositorio}/lecciones/${lesson.id_leccion}`);
+    await expect(page.getByRole('heading', { name: lessonData.titulo, exact: true })).toBeVisible();
+    for (const [tab, button, text] of [['Resumen', 'Ver resumen', lessonData.resumen_teorico],
+        ['Solucionario', 'Ver solucionario', 'Valor de x'], ['Mapa', 'Generar mapa', 'Igualdad']]) {
+        await page.getByRole('tab', { name: tab, exact: true }).click();
+        await page.getByRole('button', { name: button, exact: true }).click();
+        await expect(page.getByText(text, { exact: true })).toBeVisible();
+    }
+    await page.getByRole('tab', { name: 'Material', exact: true }).click();
+    const downloadPromise = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Descargar PDF', exact: true }).click();
+    const download = await downloadPromise;
+    assert.match(download.suggestedFilename(), /\.pdf$/);
+    assert.equal(await download.failure(), null);
+    console.log('PASS CONTENT browser: repository detail, lesson aids and PDF download');
+} finally { await browser.close(); }
 
 for (const [path, user] of [['student', student], ['teacher', teacher]]) {
     const stats = await request(`/content/stats/${path}`, { account: user });
