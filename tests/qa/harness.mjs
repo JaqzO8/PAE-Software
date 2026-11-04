@@ -4,6 +4,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { dockerExecutable } from '../../scripts/lib/docker-executable.mjs';
+import { captureBrowserCoverage } from './browser-coverage.mjs';
 export const require = createRequire(import.meta.url);
 export const origin = 'http://localhost:15173';
 export const apiOrigin = 'http://127.0.0.1:13000';
@@ -80,6 +81,7 @@ export async function browserPage(user) {
     const { chromium } = await import('@playwright/test');
     const browser = await chromium.launch({ channel: process.env.QA_BROWSER_CHANNEL || 'chrome', headless: true });
     const page = await browser.newPage({ viewport: { width: 1366, height: 900 } });
+    await captureBrowserCoverage(browser, page);
     if (user) await page.addInitScript(data => {
         localStorage.setItem('token', data.token); localStorage.setItem('user', JSON.stringify(data.user)); localStorage.setItem('role', data.user.rol);
     }, { token: user.token, user: user.user });

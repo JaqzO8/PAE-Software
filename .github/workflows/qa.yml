@@ -13,6 +13,7 @@ jobs:
     timeout-minutes: 30
     env:
       QA_BROWSER_CHANNEL: chromium
+      QA_BROWSER_COVERAGE: '1'
       NODE_V8_COVERAGE: ${{ github.workspace }}/coverage/host-v8
     steps:
       - uses: actions/checkout@v4
@@ -44,6 +45,9 @@ jobs:
       - run: node tests/qa/juan-integration.mjs
       - run: node tests/qa/learning-regressions.mjs
       - run: node tests/qa/live-learning.mjs
+      - run: node tests/qa/browser-modules.mjs
+      - run: node scripts/browser-coverage.mjs
+        if: always()
       - run: npm run qa:coverage
         if: always()
       - run: npm run qa:host-coverage
@@ -58,6 +62,7 @@ jobs:
             coverage/jest/
             coverage/host/
             coverage/frontend/
+            coverage/browser/
             coverage/qa/
             docs/estabilizacion/RESULTADOS_PRUEBAS.md
       - name: SonarQube analysis with coverage
