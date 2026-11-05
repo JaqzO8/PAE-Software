@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useLocation } from "react-router-dom";
 import { Menu } from "lucide-react";
-import { Toaster } from "../ui/Toaster";
 import { Sidebar } from "./Sidebar";
 import { 
   Sheet, 
@@ -116,7 +115,6 @@ export const TeacherLayout = ({ children }: Props) => {
           </div>
         </main>
       </div>
-      <Toaster />
     </div>
   );
 };
