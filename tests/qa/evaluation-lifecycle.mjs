@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { account, request, compose } from './harness.mjs';
+import { expect } from '@playwright/test';
+import { account, request, compose, browserPage, origin } from './harness.mjs';
 
 assert.equal(JSON.parse(compose('config', '--format', 'json')).name, 'pae_qa');
 const teacher = await account('docente'), student = await account(), outsider = await account();
@@ -46,7 +47,29 @@ await request(reviewRoute(first), { method: 'POST', account: student, data: { pu
 for (const puntaje of [-1, 6, 'invalid']) await request(reviewRoute(first), { method: 'POST', account: teacher, data: { puntaje }, status: 400 });
 await request('/learning/reviews/2147483647/questions/2147483647', { method: 'POST', account: teacher, data: { puntaje: 5 }, status: 404 });
 let final;
-for (const question of attempt.questions) {
+const { browser, page } = await browserPage(teacher);
+try {
+    await page.goto(`${origin}/docente/aprendizaje/revision-abiertas`);
+    // Locate this synthetic attempt, independently of other tests' pending answers.
+    const firstReview = reviews.find(item => String(item.id_pregunta) === String(first));
+    const score = page.locator(`#score-${firstReview.id_revision}`);
+    const reviewCard = page.locator('div.bg-card').filter({ has: score });
+    await expect(score).toBeVisible();
+    await reviewCard.getByRole('button', { name: 'Guardar', exact: true }).click();
+    await expect(page.getByText('Puntaje invalido', { exact: true })).toBeVisible();
+    for (const value of ['6', '5']) {
+        await score.fill(value);
+        await reviewCard.getByLabel('Feedback', { exact: true }).fill('Revisión confirmada desde la interfaz');
+        await reviewCard.getByRole('button', { name: 'Guardar', exact: true }).click();
+    }
+    await expect(reviewCard.getByText('Revisada', { exact: true })).toBeVisible();
+    await page.getByRole('combobox').click();
+    await page.getByRole('option', { name: 'Revisadas', exact: true }).click();
+    await expect(score).toHaveValue('5');
+    await page.reload();
+    await expect(score).toHaveCount(0);
+} finally { await browser.close(); }
+for (const question of attempt.questions.slice(1)) {
     final = (await request(reviewRoute(question.id), { method: 'POST', account: teacher,
         data: { puntaje: 5, feedback: 'Respuesta completa según rúbrica QA' },
     })).body.data.intento;

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { expect } from '@playwright/test';
-import { account, browserPage, compose, origin } from './harness.mjs';
+import { account, browserPage, compose, origin, request } from './harness.mjs';
 
 assert.equal(JSON.parse(compose('config', '--format', 'json')).name, 'pae_qa');
 const common = [
@@ -22,7 +22,7 @@ for (const role of ['estudiante', 'docente']) {
     try {
         const paths = role === 'estudiante'
             ? [['/explorar', 'Explora y Aprende'], ['/biblioteca', 'Mis Favoritos'], ['/planificacion', 'Planificacion']]
-            : [['/crear-repositorio', 'Crear Nuevo Repositorio'], ['/aprendizaje/banco-preguntas', 'Banco de Preguntas']];
+            : [['', 'Hola, Usuario'], ['/repositorios/explorar', 'Repositorios Públicos'], ['/repositorios/favoritos', 'Mis Favoritos'], ['/crear-repositorio', 'Crear Nuevo Repositorio'], ['/aprendizaje/banco-preguntas', 'Banco de Preguntas']];
         for (const [path, heading] of [...paths, ...common]) {
             await page.goto(`${origin}/${role}${path}`);
             await expect(page.getByRole('heading', { name: heading, exact: true })).toBeVisible();
@@ -47,6 +47,26 @@ for (const role of ['estudiante', 'docente']) {
             await page.goto(`${origin}/docente/aprendizaje/banco-preguntas`);
             await expect(page).not.toHaveURL(/\/docente\//);
             await expect(page.getByRole('heading', { name: 'Banco de Preguntas', exact: true })).toHaveCount(0);
+        } else {
+            const analytics = (await request('/learning/analytics/settings', { account: user })).body.data;
+            const study = (await request('/content/stats/study-settings', { account: user })).body.data;
+            try {
+                await page.goto(`${origin}/docente`);
+                await page.getByLabel('Bajo rendimiento (%)', { exact: true }).fill('65');
+                const tracking = page.locator('div.bg-card').filter({ hasText: 'Reglas de seguimiento' });
+                await tracking.getByRole('button', { name: 'Guardar', exact: true }).click();
+                await expect(page.getByText('Configuracion actualizada', { exact: true })).toBeVisible();
+                assert.equal((await request('/learning/analytics/settings', { account: user })).body.data.lowPerformanceThreshold, 65);
+                await page.getByLabel('Descanso cada (min)', { exact: true }).fill('40');
+                const habits = page.locator('div.bg-card').filter({ hasText: 'Reglas de habitos de estudio' });
+                await habits.getByRole('button', { name: 'Guardar', exact: true }).click();
+                await expect.poll(async () => (await request('/content/stats/study-settings', { account: user })).body.data.restReminderMinutes).toBe(40);
+                await page.reload();
+                await expect(page.getByLabel('Descanso cada (min)', { exact: true })).toHaveValue('40');
+            } finally {
+                await request('/learning/analytics/settings', { method: 'PUT', account: user, data: analytics });
+                await request('/content/stats/study-settings', { method: 'PUT', account: user, data: study });
+            }
         }
         assert.deepEqual(errors, [], 'Pages must render without uncaught JavaScript errors');
         assert.deepEqual(serverErrors, [], 'Module navigation must not trigger backend failures');

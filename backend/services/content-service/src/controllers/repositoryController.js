@@ -195,9 +195,14 @@ class RepositoryController {
         try {
             const { id } = req.params;
             const userId = req.user?.id;
+            const where = { id_repositorio: id, activo: true };
+            if (req.user?.rol !== 'admin') {
+                if (userId) where[Op.or] = [{ publico: true }, { id_profesor: userId }];
+                else where.publico = true;
+            }
 
             const repository = await Repository.findOne({
-                where: { id_repositorio: id, activo: true, publico: true },
+                where,
                 include: [
                     { model: Category, as: 'categoria' },
                     { model: Tag, as: 'tags', through: { attributes: [] } },
@@ -246,10 +251,13 @@ class RepositoryController {
                 });
             }
 
+            const data = repository.toJSON();
+            const canManage = req.user?.rol === 'admin' || (userId && String(repository.id_profesor) === String(userId));
+            if (!canManage && data.recursos) data.recursos = data.recursos.filter(resource => resource.publicado !== false);
             res.status(200).json({
                 success: true,
                 data: {
-                    ...repository.toJSON(),
+                    ...data,
                     isFavorite,
                     myRating,
                 },
