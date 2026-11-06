@@ -7,7 +7,7 @@ async function migrate(sequelize) {
         await sequelize.query("SELECT pg_advisory_xact_lock(hashtext('community_schema_migrations'))", { transaction });
         await sequelize.query('CREATE TABLE IF NOT EXISTS community_schema_migrations (name TEXT PRIMARY KEY, checksum TEXT NOT NULL, applied_at TIMESTAMPTZ NOT NULL DEFAULT now())', { transaction });
         const directory = path.join(__dirname, '../migrations');
-        const migrationFiles = fs.readdirSync(directory).filter(name => /^\d+_.+\.sql$/.test(name)).sort();
+        const migrationFiles = fs.readdirSync(directory).filter(name => /^\d+_.+\.sql$/.test(name)).sort((a, b) => a.localeCompare(b, 'en'));
         await migrationFiles.reduce(async (previousPromise, name) => {
             await previousPromise;
             const sql = fs.readFileSync(path.join(directory, name), 'utf8');
@@ -22,7 +22,7 @@ async function migrate(sequelize) {
         }, Promise.resolve());
     });
 }
-if (require.main === module) {
+if (require.main?.filename === __filename) {
     const { sequelize } = require('../src/config/database');
     migrate(sequelize).then(() => console.log('Community migrations applied')).catch(() => { console.error('Community migration failed'); process.exitCode = 1; }).finally(() => sequelize.close());
 }

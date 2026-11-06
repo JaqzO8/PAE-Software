@@ -31,7 +31,7 @@ const startServer = async () => {
     }
 };
 
-if (require.main === module) {
+if (require.main?.filename === __filename) {
     startServer();
 }
 

@@ -31,7 +31,7 @@ const testConnection = async () => {
 const syncDatabase = async () => {
     await sequelize.sync();
     const migrationsPath = path.join(__dirname, '../../migrations');
-    const migrations = readdirSync(migrationsPath).filter((file) => file.endsWith('.sql')).sort();
+    const migrations = readdirSync(migrationsPath).filter((file) => file.endsWith('.sql')).sort((a, b) => a.localeCompare(b, 'en'));
     await migrations.reduce(async (previousPromise, file) => {
         await previousPromise;
         const sql = readFileSync(path.join(migrationsPath, file), 'utf8');

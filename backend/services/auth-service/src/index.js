@@ -40,7 +40,7 @@ const startServer = async () => {
     }
 };
 
-if (require.main === module) {
+if (require.main?.filename === __filename) {
     // Manejo de errores no capturados
     process.on('unhandledRejection', (err) => {
         console.error('❌ Unhandled Rejection:', err);

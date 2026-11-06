@@ -56,6 +56,9 @@ test('RIC-15: verifyBackupIntegrity detecta archivo faltante o corrupción de by
     const missingCheck = verifyBackupIntegrity(manifest, {});
     assert.equal(missingCheck.valid, false);
     assert.match(missingCheck.errors[0], /Archivo ausente/);
+    const nullCheck = verifyBackupIntegrity(manifest, new Map([['auth_db.sql', null]]));
+    assert.equal(nullCheck.valid, false);
+    assert.match(nullCheck.errors[0], /Archivo ausente/);
 });
 
 test('RIC-15: validateDatabaseDump valida presencia de tablas requeridas antes del restore', async () => {

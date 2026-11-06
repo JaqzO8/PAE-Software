@@ -34,7 +34,7 @@ const startServer = async () => {
     }
 };
 
-if (require.main === module) {
+if (require.main?.filename === __filename) {
     process.on('unhandledRejection', (err) => {
         console.error('❌ Unhandled Rejection:', err);
         process.exit(1);

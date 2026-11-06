@@ -65,7 +65,7 @@ export function verifyBackupIntegrity(manifest, fileContents) {
 
     for (const file of manifest.files) {
         const content = getContent(file.filename);
-        if (content === undefined || content === null) {
+        if (content == null) {
             errors.push(`Archivo ausente en respaldo: ${file.filename}`);
             continue;
         }

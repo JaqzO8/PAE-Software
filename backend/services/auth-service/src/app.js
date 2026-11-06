@@ -55,10 +55,7 @@ function createApp() {
 
     // Request logging (solo en desarrollo)
     if (config.NODE_ENV === 'development') {
-        app.use((req, res, next) => {
-            console.log(JSON.stringify({ event: 'http_request', method: req.method, path: req.path.slice(0, 200) }));
-            next();
-        });
+        app.use(require('./middlewares/requestLogger'));
     }
 
     // ========================================
