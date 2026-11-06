@@ -15,4 +15,4 @@ La integración añade pruebas HTTP reales de preferencias, recordatorios, aisla
 - Cobertura: importar reportes reales, medir código nuevo en Sonar y ampliar pruebas sobre las líneas sin ejecutar. No usar exclusiones para lograr 80% artificialmente.
 - Frontend: corregir deuda de lint heredada y ampliar pruebas de pantallas de evaluación, administración y accesibilidad. Una compilación correcta no cierra esos requisitos.
 
-Las 64 pruebas son una matriz de estabilización reproducible del alcance descrito, no una certificación de todas las historias del proyecto ni una prueba de capacidad productiva.
+Las 72 pruebas son una matriz de estabilización reproducible del alcance descrito, no una certificación de todas las historias del proyecto ni una prueba de capacidad productiva.

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
+import { registerCompletionCases } from './completion-cases.mjs';
 import { pair, scenario as s, require, request, account, group, invite, accept, message, messages, metrics, wave, sustained, sql, compose, browserPage, screenshot, origin } from './harness.mjs';
 const { validarPoliticaPassword, validarCodigoMfa } = require('../../backend/services/auth-service/src/domain/politicaSesion');
 const { deviceName } = require('../../backend/services/auth-service/src/utils/deviceInfo');
@@ -111,3 +112,5 @@ pair('PA',2,
 pair('PA',3,
  s('Preferencias persistentes y aislamiento', 'Cuenta A elige dark; cuenta B independiente', 'A conserva dark; B no cambia', async()=>{const a=await account(),b=await account();const prior=(await request('/auth/preferences',{account:b})).body;await request('/auth/preferences',{method:'PUT',account:a,data:{theme:'dark'}});assert.equal((await request('/auth/preferences',{account:a})).body.preferences.theme,'dark');assert.deepEqual((await request('/auth/preferences',{account:b})).body.preferences,prior.preferences);}),
  s('Cuenta desactivada sin acceso residual', 'Desactivar cuenta con JWT vigente', '401 en identidad, preferencias y evaluación', async()=>{const user=await account();sql('qa_auth',`UPDATE usuarios SET activo=false WHERE id_usuario=${user.user.id}`);for(const route of ['/auth/verify','/auth/preferences','/learning/simulacro/results'])await request(route,{account:user,status:401});}));
+
+registerCompletionCases();

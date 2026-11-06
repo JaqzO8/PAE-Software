@@ -1,6 +1,20 @@
-# Matriz ejecutable: 32 óptimos + 32 pésimos
+# Matriz ejecutable: 36 óptimos + 36 pesimistas
 
-Los 64 casos cubren nueve categorías. Cargas locales acotadas; los umbrales son presupuestos de ingeniería para esta ejecución, no una certificación de producción. Un caso adverso aprueba cuando se observa el rechazo o recuperación especificado. Las pruebas de interfaz usan navegador real; PI-P01 y PR-P03 inducen fallo de transporte en el navegador y no prueban una caída real del servicio. PE-P03 sí detiene Redis aislado.
+Los 72 casos cubren nueve categorías, con un mínimo exigido de 4 óptimos y 4 pesimistas por categoría.
+
+| Categoría | Óptimos | Pesimistas |
+|---|---:|---:|
+| Unitarias | 4 | 4 |
+| Carga | 4 | 4 |
+| Rendimiento | 4 | 4 |
+| Concurrencia | 4 | 4 |
+| Estrés | 4 | 4 |
+| Sistema | 4 | 4 |
+| Integración | 4 | 4 |
+| Regresión | 4 | 4 |
+| Aceptación | 4 | 4 |
+
+Cargas locales acotadas; los umbrales son presupuestos de ingeniería para esta ejecución, no una certificación de producción. Un caso adverso aprueba cuando se observa el rechazo o recuperación especificado. Las pruebas de interfaz usan navegador real; PI-P01, PR-P03 y PS-P04 inducen fallo de transporte en el navegador y no prueban una caída real del servicio. PE-P03 sí detiene Redis aislado.
 
 Los fixtures quedan únicamente en el volumen qa-db y se crean con identificadores únicos; nunca se borran datos de pruebas_pae. Los límites de CPU se restauran en finally.
 
@@ -643,3 +657,83 @@ Los fixtures quedan únicamente en el volumen qa-db y se crean con identificador
 - Procedimiento: ejecutar `QA_CASES=PA-P03 node tests/qa/run.mjs` (PowerShell: `$env:QA_CASES='PA-P03'; node tests/qa/run.mjs`). La implementación exacta está en `tests/qa/cases.mjs`.
 - Resultado esperado/criterio de aprobación: 401 en identidad, preferencias y evaluación. Se comprueba mediante assertions; cualquier discrepancia falla el caso.
 - Resultado real, estado, evidencia y defecto: véase fila PA-P03 en RESULTADOS_PRUEBAS.md y test-results/qa/results.json.
+
+## PS-O04 — Soporte completo desde interfaz hasta persistencia
+
+- Categoría: Sistema; escenario: óptimo.
+- Objetivo/funcionalidad: Soporte completo desde interfaz hasta persistencia.
+- Precondiciones: entorno aislado pae_qa iniciado con código de la rama; PostgreSQL y Redis disponibles, excepto durante el fallo inducido descrito. Datos sintéticos nuevos por caso, sin uso de cuentas reales.
+- Entrada: Alumno envía ticket válido por navegador y recarga.
+- Procedimiento: ejecutar `QA_CASES=PS-O04 node tests/qa/run.mjs` (PowerShell: `$env:QA_CASES='PS-O04'; node tests/qa/run.mjs`). La implementación exacta está en `tests/qa/cases.mjs`.
+- Resultado esperado/criterio de aprobación: Confirmación, ticket visible tras recargar, misma identidad en API y una fila en PostgreSQL. Se comprueba mediante assertions; cualquier discrepancia falla el caso.
+- Resultado real, estado, evidencia y defecto: véase fila PS-O04 en RESULTADOS_PRUEBAS.md y test-results/qa/results.json.
+
+## PS-P04 — Soporte ante fallo de transporte
+
+- Categoría: Sistema; escenario: pésimo.
+- Objetivo/funcionalidad: Soporte ante fallo de transporte.
+- Precondiciones: entorno aislado pae_qa iniciado con código de la rama; PostgreSQL y Redis disponibles, excepto durante el fallo inducido descrito. Datos sintéticos nuevos por caso, sin uso de cuentas reales.
+- Entrada: Interrupción controlada del POST de soporte en el navegador con 503.
+- Procedimiento: ejecutar `QA_CASES=PS-P04 node tests/qa/run.mjs` (PowerShell: `$env:QA_CASES='PS-P04'; node tests/qa/run.mjs`). La implementación exacta está en `tests/qa/cases.mjs`.
+- Resultado esperado/criterio de aprobación: Error visible, formulario recuperable y ningún ticket ni confirmación ficticia. Se comprueba mediante assertions; cualquier discrepancia falla el caso.
+- Resultado real, estado, evidencia y defecto: véase fila PS-P04 en RESULTADOS_PRUEBAS.md y test-results/qa/results.json.
+
+## PI-O04 — Identidad central autoriza contenido privado propio
+
+- Categoría: Integración; escenario: óptimo.
+- Objetivo/funcionalidad: Identidad central autoriza contenido privado propio.
+- Precondiciones: entorno aislado pae_qa iniciado con código de la rama; PostgreSQL y Redis disponibles, excepto durante el fallo inducido descrito. Datos sintéticos nuevos por caso, sin uso de cuentas reales.
+- Entrada: Docente de Auth crea repositorio privado en Content y lo consulta mediante gateway.
+- Procedimiento: ejecutar `QA_CASES=PI-O04 node tests/qa/run.mjs` (PowerShell: `$env:QA_CASES='PI-O04'; node tests/qa/run.mjs`). La implementación exacta está en `tests/qa/cases.mjs`.
+- Resultado esperado/criterio de aprobación: Detalle y listado propio conservan el repositorio privado y su propietario. Se comprueba mediante assertions; cualquier discrepancia falla el caso.
+- Resultado real, estado, evidencia y defecto: véase fila PI-O04 en RESULTADOS_PRUEBAS.md y test-results/qa/results.json.
+
+## PI-P04 — Contenido privado no cruza identidades
+
+- Categoría: Integración; escenario: pésimo.
+- Objetivo/funcionalidad: Contenido privado no cruza identidades.
+- Precondiciones: entorno aislado pae_qa iniciado con código de la rama; PostgreSQL y Redis disponibles, excepto durante el fallo inducido descrito. Datos sintéticos nuevos por caso, sin uso de cuentas reales.
+- Entrada: Otro docente autenticado y visitante anónimo consultan el mismo repositorio privado.
+- Procedimiento: ejecutar `QA_CASES=PI-P04 node tests/qa/run.mjs` (PowerShell: `$env:QA_CASES='PI-P04'; node tests/qa/run.mjs`). La implementación exacta está en `tests/qa/cases.mjs`.
+- Resultado esperado/criterio de aprobación: Ambos reciben 404 sin detalle; el propietario mantiene acceso. Se comprueba mediante assertions; cualquier discrepancia falla el caso.
+- Resultado real, estado, evidencia y defecto: véase fila PI-P04 en RESULTADOS_PRUEBAS.md y test-results/qa/results.json.
+
+## PG-O04 — Propietario de desafío conserva permisos con IDs serializados
+
+- Categoría: Regresión; escenario: óptimo.
+- Objetivo/funcionalidad: Propietario de desafío conserva permisos con IDs serializados.
+- Precondiciones: entorno aislado pae_qa iniciado con código de la rama; PostgreSQL y Redis disponibles, excepto durante el fallo inducido descrito. Datos sintéticos nuevos por caso, sin uso de cuentas reales.
+- Entrada: Propietario de PostgreSQL y JWT actualiza y completa su desafío.
+- Procedimiento: ejecutar `QA_CASES=PG-O04 node tests/qa/run.mjs` (PowerShell: `$env:QA_CASES='PG-O04'; node tests/qa/run.mjs`). La implementación exacta está en `tests/qa/cases.mjs`.
+- Resultado esperado/criterio de aprobación: 200 y cambios persistidos; no reaparece el rechazo 403 por diferencia de tipos. Se comprueba mediante assertions; cualquier discrepancia falla el caso.
+- Resultado real, estado, evidencia y defecto: véase fila PG-O04 en RESULTADOS_PRUEBAS.md y test-results/qa/results.json.
+
+## PG-P04 — Corrección de propiedad no concede edición a terceros
+
+- Categoría: Regresión; escenario: pésimo.
+- Objetivo/funcionalidad: Corrección de propiedad no concede edición a terceros.
+- Precondiciones: entorno aislado pae_qa iniciado con código de la rama; PostgreSQL y Redis disponibles, excepto durante el fallo inducido descrito. Datos sintéticos nuevos por caso, sin uso de cuentas reales.
+- Entrada: Miembro intenta completar el desafío del docente.
+- Procedimiento: ejecutar `QA_CASES=PG-P04 node tests/qa/run.mjs` (PowerShell: `$env:QA_CASES='PG-P04'; node tests/qa/run.mjs`). La implementación exacta está en `tests/qa/cases.mjs`.
+- Resultado esperado/criterio de aprobación: 403; nombre y estado originales permanecen intactos. Se comprueba mediante assertions; cualquier discrepancia falla el caso.
+- Resultado real, estado, evidencia y defecto: véase fila PG-P04 en RESULTADOS_PRUEBAS.md y test-results/qa/results.json.
+
+## PA-O04 — Exportación personal útil sin credenciales
+
+- Categoría: Aceptación; escenario: óptimo.
+- Objetivo/funcionalidad: Exportación personal útil sin credenciales.
+- Precondiciones: entorno aislado pae_qa iniciado con código de la rama; PostgreSQL y Redis disponibles, excepto durante el fallo inducido descrito. Datos sintéticos nuevos por caso, sin uso de cuentas reales.
+- Entrada: Alumno solicita sus datos después de registrar una solicitud de soporte.
+- Procedimiento: ejecutar `QA_CASES=PA-O04 node tests/qa/run.mjs` (PowerShell: `$env:QA_CASES='PA-O04'; node tests/qa/run.mjs`). La implementación exacta está en `tests/qa/cases.mjs`.
+- Resultado esperado/criterio de aprobación: Perfil propio y ticket presentes; ninguna contraseña o credencial de sesión exportada. Se comprueba mediante assertions; cualquier discrepancia falla el caso.
+- Resultado real, estado, evidencia y defecto: véase fila PA-O04 en RESULTADOS_PRUEBAS.md y test-results/qa/results.json.
+
+## PA-P04 — Exportación no acepta suplantación de otra cuenta
+
+- Categoría: Aceptación; escenario: pésimo.
+- Objetivo/funcionalidad: Exportación no acepta suplantación de otra cuenta.
+- Precondiciones: entorno aislado pae_qa iniciado con código de la rama; PostgreSQL y Redis disponibles, excepto durante el fallo inducido descrito. Datos sintéticos nuevos por caso, sin uso de cuentas reales.
+- Entrada: Cuenta ajena añade userId del propietario al exportar datos.
+- Procedimiento: ejecutar `QA_CASES=PA-P04 node tests/qa/run.mjs` (PowerShell: `$env:QA_CASES='PA-P04'; node tests/qa/run.mjs`). La implementación exacta está en `tests/qa/cases.mjs`.
+- Resultado esperado/criterio de aprobación: Solo devuelve sus propios datos y ningún ticket del propietario; anónimo recibe 401. Se comprueba mediante assertions; cualquier discrepancia falla el caso.
+- Resultado real, estado, evidencia y defecto: véase fila PA-P04 en RESULTADOS_PRUEBAS.md y test-results/qa/results.json.
