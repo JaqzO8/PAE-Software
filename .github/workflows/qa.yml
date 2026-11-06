@@ -89,6 +89,7 @@ jobs:
       - run: node tests/qa/browser-authoring.mjs
       - run: node tests/qa/operational-probes.mjs
       - run: node tests/qa/community-management.mjs
+      - run: node tests/qa/proxy-recovery.mjs
       - run: node scripts/browser-coverage.mjs
         if: always()
       - run: npm run qa:coverage
