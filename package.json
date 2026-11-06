@@ -1,5 +1,7 @@
 {
   "devDependencies": {
+    "@playwright/test": "^1.64.1",
+    "c8": "^12.0.0",
     "jest": "^30.3.0",
     "supertest": "^7.2.2"
   },
@@ -11,6 +13,10 @@
     "node": ">=24 <25"
   },
   "scripts": {
+    "test": "npm run test:content:core && npm run test:learning && npm run test:ops && npm run test:frontend && node --test tests/architecture/eventContracts.test.cjs",
+    "test:content:core": "npm --prefix backend/services/content-service exec jest src/tests/unit src/tests/integration --runInBand",
+    "test:ops": "node --test tests/m8/backupRestore.test.cjs tests/m8/accessibilityAudit.test.cjs",
+    "test:frontend": "npm run build --prefix frontend",
     "setup:local": "node scripts/setup-local.mjs",
     "check:safety": "node scripts/check-repository-safety.mjs",
     "test:exam": "jest backend/services/exam-service/src/tests --runInBand --ci",
@@ -19,7 +25,16 @@
     "test:architecture": "node --test tests/architecture/*.test.cjs",
     "test:learning": "npm test --prefix backend/services/learning-service",
     "test:docker": "node scripts/test-docker-architecture.mjs",
-    "test:auth": "node --test tests/auth/roleSecurity.test.cjs tests/auth/mfaFlow.test.cjs tests/auth/passwordResetRace.test.cjs tests/auth/publicUsersDto.test.cjs tests/auth/sessionRevocationCrossService.test.cjs",
-    "test:m8": "node --test tests/m8/platformPreferences.test.cjs tests/m8/notificationTransport.test.cjs tests/m8/backupRestore.test.cjs tests/m8/accessibilityAudit.test.cjs tests/m8/infrastructureSecurity.test.cjs"
+    "test:content": "npm test --prefix backend/services/content-service -- --runInBand",
+    "test:auth": "node --import ./tests/unit-environment.mjs --test tests/auth/*.test.cjs",
+    "test:m8": "node --import ./tests/unit-environment.mjs --test tests/m8/platformPreferences.test.cjs tests/m8/notificationTransport.test.cjs tests/m8/backupRestore.test.cjs tests/m8/accessibilityAudit.test.cjs tests/m8/infrastructureSecurity.test.cjs",
+    "qa:up": "node scripts/qa-environment.mjs up",
+    "qa:stop": "node scripts/qa-environment.mjs stop",
+    "qa:spec": "node tests/qa/run.mjs --spec-only",
+    "test:qa": "node tests/qa/run.mjs",
+    "qa:coverage": "node scripts/qa-coverage.mjs && c8 report --all --include \"backend/services/**/src/**/*.js\" --include \"backend/services/**/scripts/**/*.js\" --exclude \"**/tests/**\" --exclude \"**/*.test.js\" --reporter=lcov --reporter=json-summary --reporter=text-summary --temp-directory coverage/qa-v8 --reports-dir coverage/qa",
+    "test:coverage": "c8 --all --include \"backend/services/**/src/**/*.js\" --include \"scripts/**/*.mjs\" --exclude \"**/tests/**\" --exclude \"**/*.test.js\" --reporter=lcov --reporter=json-summary --reporter=text-summary --reports-dir coverage/unit node scripts/unit-coverage.mjs",
+    "test:qa:security": "node tests/qa/security-regressions.mjs",
+    "qa:host-coverage": "c8 report --all --include \"scripts/**/*.mjs\" --reporter=lcov --reporter=json-summary --temp-directory coverage/host-v8 --reports-dir coverage/host"
   }
 }

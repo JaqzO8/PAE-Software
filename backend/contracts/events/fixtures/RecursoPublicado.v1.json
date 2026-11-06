@@ -1,0 +1,16 @@
+{
+  "eventId": "21f4c784-0e31-4899-b1d4-8395e868a29a",
+  "type": "RecursoPublicado.v1",
+  "schemaVersion": 1,
+  "producer": "content",
+  "occurredAt": "2026-10-25T12:00:00.000Z",
+  "correlationId": "c92d5218-1c46-4cb2-8789-53213ab1e421",
+  "data": {
+    "resourceId": "15",
+    "repositoryId": "3",
+    "teacherId": "10",
+    "title": "Guía Práctica de Álgebra Lineal",
+    "resourceType": "pdf",
+    "isPublic": true
+  }
+}

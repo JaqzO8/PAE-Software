@@ -18,7 +18,7 @@ const fileFilter = (req, file, cb) => {
     if (config.ALLOWED_FILE_TYPES.includes(file.mimetype)) {
         cb(null, true);
     } else {
-        cb(new Error('Tipo de archivo no permitido. Solo PDF.'), false);
+        cb(Object.assign(new Error('Tipo de archivo no permitido. Solo PDF.'), { status: 415 }), false);
     }
 };
 

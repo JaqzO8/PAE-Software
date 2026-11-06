@@ -4,12 +4,13 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useNavigate } from "react-router-dom";
 import { UploadCloud, ArrowLeft, X } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { api } from "../../../services/api";
 
 import { 
   Button, Input, Textarea, Form, FormControl, FormField, FormItem, FormLabel, 
   FormMessage, FormDescription, Card, CardContent, CardHeader, CardTitle, 
-  CardDescription, Badge
+  CardDescription, Badge, Checkbox
 } from "../../../desingSystem/primitives";
 
 import { useMyRepositories } from "../../../features/repository/hooks/useMyRepositories";
@@ -19,7 +20,7 @@ import styles from "../../../features/repository/components/repository.module.cs
 const repoSchema = z.object({
   titulo: z.string().min(5, "El título debe tener al menos 5 caracteres"),
   descripcion: z.string().optional(),
-  id_categoria: z.number().optional(),
+  id_categoria: z.number().int().positive("Selecciona una categoría"),
   tags: z.array(z.string()).optional(),
   publico: z.boolean().default(true),
 });
@@ -34,11 +35,24 @@ const TeacherRepoCreate = () => {
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [tagInput, setTagInput] = useState("");
   const [tags, setTags] = useState<string[]>([]);
+  const [categories, setCategories] = useState<{ id_categoria: number; nombre: string }[]>([]);
+  const [categoryError, setCategoryError] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    api.get("/content/categories").then(response => {
+      if (active) setCategories(response.data.data);
+    }).catch(() => {
+      if (active) setCategoryError(true);
+    });
+    return () => { active = false; };
+  }, []);
   
   const form = useForm<RepoFormInput, unknown, RepoFormData>({
     resolver: zodResolver(repoSchema),
     defaultValues: { 
       titulo: "", 
+      id_categoria: 0,
       descripcion: "",
       publico: true,
       tags: [],
@@ -144,6 +158,25 @@ const TeacherRepoCreate = () => {
                 )}
               />
 
+              <FormField
+                control={form.control}
+                name="id_categoria"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Categoría *</FormLabel>
+                    <FormControl>
+                      <select className="h-10 w-full rounded-md border bg-background px-3" {...field}
+                        onChange={event => field.onChange(Number(event.target.value))} disabled={!categories.length}>
+                        <option value={0}>Selecciona una categoría</option>
+                        {categories.map(category => <option key={category.id_categoria} value={category.id_categoria}>{category.nombre}</option>)}
+                      </select>
+                    </FormControl>
+                    {categoryError && <p role="alert" className="text-sm text-destructive">No se pudieron cargar las categorías. Recarga la página para reintentar.</p>}
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
               {/* Tags */}
               <div className="space-y-3">
                 <FormLabel>Etiquetas</FormLabel>
@@ -194,14 +227,15 @@ const TeacherRepoCreate = () => {
               <FormField
                 control={form.control}
                 name="publico"
-                render={() => (
+                render={({ field }) => (
                   <FormItem className="flex items-center justify-between rounded-lg border p-4">
                     <div className="space-y-0.5">
                       <FormLabel className="text-base">Repositorio Público</FormLabel>
                       <FormDescription>
-                        Los estudiantes podrán encontrar y acceder a este repositorio
+                        {field.value ? "Los estudiantes podrán encontrar y acceder a este repositorio" : "Solo tú podrás acceder a este repositorio"}
                       </FormDescription>
                     </div>
+                    <FormControl><Checkbox checked={field.value} onCheckedChange={checked => field.onChange(checked === true)} /></FormControl>
                   </FormItem>
                 )}
               />

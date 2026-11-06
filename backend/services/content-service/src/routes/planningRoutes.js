@@ -7,6 +7,7 @@ router.get('/', verifyToken, isAuthenticated, PlanningController.getOverview);
 router.put('/preferences', verifyToken, isAuthenticated, PlanningController.updatePreference);
 router.post('/reminders/generate', verifyToken, isAuthenticated, PlanningController.generateReminders);
 router.patch('/reminders/:id/status', verifyToken, isAuthenticated, PlanningController.updateReminderStatus);
+router.post('/reminders/:id/cancel', verifyToken, isAuthenticated, PlanningController.cancelReminder);
 router.put('/settings', verifyToken, isTeacher, PlanningController.updateSettings);
 
 module.exports = router;

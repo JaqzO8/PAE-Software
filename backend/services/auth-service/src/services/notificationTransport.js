@@ -12,7 +12,7 @@
  *    'fallido' (error de destino/proveedor).
  */
 
-const crypto = require('crypto');
+const crypto = require('node:crypto');
 
 // Memoria de deduplicación con TTL (para tests y entorno sin Redis)
 const processedDeliveries = new Map();
@@ -61,15 +61,8 @@ class NotificationTransport {
         this.now = now;
     }
 
-    async _defaultSendAdapter({ recipient, templateId, payload }) {
-        // Adaptador por defecto: simula envío seguro local/test
-        if (!recipient) {
-            throw new Error('Destinatario no especificado');
-        }
-        return {
-            delivered: true,
-            providerId: `prov_${crypto.randomBytes(8).toString('hex')}`,
-        };
+    async _defaultSendAdapter() {
+        throw new Error('Proveedor de notificaciones no configurado');
     }
 
     /**

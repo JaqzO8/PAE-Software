@@ -1,6 +1,6 @@
 const { Sesion, HistorialSesion } = require('../models');
-const { v4: uuidv4 } = require('uuid');
 const crypto = require('crypto');
+const { sequelize } = require('../config/database');
 
 const truncate = (value, maxLength) => {
     if (!value) return value;
@@ -13,6 +13,16 @@ const tokenFingerprint = (token) => crypto
     .digest('hex');
 
 class SessionService {
+    static async rotateSession(userId, oldToken, newToken) {
+        return sequelize.transaction(async transaction => {
+            const session = await Sesion.findOne({
+                where: { id_usuario: userId, token_sesion: tokenFingerprint(oldToken), activa: true },
+                transaction, lock: transaction.LOCK.UPDATE,
+            });
+            if (!session) throw Object.assign(new Error('La sesión ya no está activa'), { status: 401 });
+            await session.update({ token_sesion: tokenFingerprint(newToken), fecha_ultimo_acceso: new Date() }, { transaction });
+        });
+    }
     /**
      * Crea una nueva sesión
      */
@@ -71,8 +81,7 @@ class SessionService {
 
             return true;
         } catch (error) {
-            console.error('Error desactivando sesión:', error);
-            return false;
+            throw Object.assign(new Error('No se pudo cerrar la sesión'), { status: 503 });
         }
     }
 
@@ -91,8 +100,7 @@ class SessionService {
 
             return true;
         } catch (error) {
-            console.error('Error desactivando todas las sesiones:', error);
-            return false;
+            throw Object.assign(new Error('No se pudieron cerrar las sesiones'), { status: 503 });
         }
     }
 

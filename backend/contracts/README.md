@@ -16,4 +16,4 @@ Errores nuevos de Comunidad: `{ success:false, code, message }`; 400 entrada, 40
 
 Los IDs de eventos son UUID, referencias de usuario/intento cadenas decimales, fechas UTC. El payload no incluye respuestas, notas ni perfiles. El consumidor solo recibe eventos de un futuro transporte autenticado; comprobar `producer` no autentica al emisor. No existe endpoint público para conceder puntos.
 
-Pendientes compartidos: contrato autoritativo de revocación REST/WSS, LeccionCompletada.v1, ResultadoRevisado, archivos de Contenido por membresía y transporte de eventos. Outbox se escribe con la concesión, pero todavía no hay publicador/broker/reintentos operativos.
+Pendientes compartidos: contrato autoritativo de revocación REST/WSS, ResultadoRevisado, archivos de Contenido por membresía y transporte/broker productivo. `LeccionCompletada.v1` y `RecursoPublicado.v1` ya tienen schema, fixtures, productor Outbox, validación y consumidores idempotentes en el alcance de Juan; su transporte operativo aún depende del despliegue compartido.

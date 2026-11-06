@@ -30,6 +30,15 @@ const normalizeDays = (days) => {
 };
 
 const normalizeTime = (value, fallback) => (/^\d{2}:\d{2}$/.test(String(value || '')) ? value : fallback);
+const normalizeTimeZone = (value, fallback = 'America/Lima') => {
+    const candidate = String(value || fallback);
+    try {
+        new Intl.DateTimeFormat('en-US', { timeZone: candidate }).format();
+        return candidate;
+    } catch {
+        return fallback;
+    }
+};
 
 const toPreferencePayload = (preference) => ({
     preferredDays: preference.dias_preferidos,
@@ -37,6 +46,7 @@ const toPreferencePayload = (preference) => ({
     endTime: preference.hora_fin,
     subjects: preference.materias,
     remindersEnabled: preference.recordatorios_activos,
+    timeZone: preference.zona_horaria || 'America/Lima',
 });
 
 const buildSlotDate = (baseDate, time) => {
@@ -97,6 +107,7 @@ class PlanningController {
             const reminders = await StudyReminder.findAll({
                 where: {
                     id_usuario: req.user.id,
+                    estado: 'pendiente',
                     programado_para: { [Op.gte]: new Date() },
                 },
                 order: [['programado_para', 'ASC']],
@@ -124,7 +135,7 @@ class PlanningController {
                 defaults: { id_usuario: req.user.id },
             });
 
-            await preference.update({
+            const nextPreference = {
                 dias_preferidos: normalizeDays(req.body.preferredDays),
                 hora_inicio: normalizeTime(req.body.startTime, preference.hora_inicio),
                 hora_fin: normalizeTime(req.body.endTime, preference.hora_fin),
@@ -132,7 +143,19 @@ class PlanningController {
                     ? req.body.subjects.map((subject) => String(subject).trim()).filter(Boolean).slice(0, 8)
                     : preference.materias,
                 recordatorios_activos: req.body.remindersEnabled !== false,
-            });
+                zona_horaria: normalizeTimeZone(req.body.timeZone, preference.zona_horaria),
+            };
+            const scheduleChanged = nextPreference.dias_preferidos.join(',') !== preference.dias_preferidos.join(',')
+                || nextPreference.hora_inicio !== preference.hora_inicio
+                || nextPreference.hora_fin !== preference.hora_fin
+                || nextPreference.zona_horaria !== preference.zona_horaria;
+            await preference.update(nextPreference);
+            if (scheduleChanged || !nextPreference.recordatorios_activos) {
+                await StudyReminder.update(
+                    { estado: 'omitido' },
+                    { where: { id_usuario: req.user.id, estado: 'pendiente', programado_para: { [Op.gte]: new Date() } } },
+                );
+            }
 
             res.status(200).json({ success: true, data: toPreferencePayload(preference) });
         } catch (error) {
@@ -187,7 +210,26 @@ class PlanningController {
             const status = ['pendiente', 'completado', 'omitido'].includes(req.body.status)
                 ? req.body.status
                 : 'pendiente';
+            if (reminder.estado !== 'pendiente' && status === 'pendiente') {
+                return res.status(409).json({ success: false, message: 'No se puede reactivar un recordatorio cerrado' });
+            }
             await reminder.update({ estado: status });
+            return res.status(200).json({ success: true, data: reminder });
+        } catch (error) {
+            return next(error);
+        }
+    }
+
+    static async cancelReminder(req, res, next) {
+        try {
+            const reminder = await StudyReminder.findOne({
+                where: { id_recordatorio: req.params.id, id_usuario: req.user.id },
+            });
+            if (!reminder) return res.status(404).json({ success: false, message: 'Recordatorio no encontrado' });
+            if (reminder.estado !== 'pendiente') {
+                return res.status(409).json({ success: false, message: 'El recordatorio ya no está pendiente' });
+            }
+            await reminder.update({ estado: 'omitido' });
             return res.status(200).json({ success: true, data: reminder });
         } catch (error) {
             return next(error);

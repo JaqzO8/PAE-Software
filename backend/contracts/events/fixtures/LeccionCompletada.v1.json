@@ -1,0 +1,14 @@
+{
+  "eventId": "e83965b2-a423-45f8-8ec1-6a2c0709b114",
+  "type": "LeccionCompletada.v1",
+  "schemaVersion": 1,
+  "producer": "content",
+  "occurredAt": "2026-10-25T14:30:00.000Z",
+  "correlationId": "50e932b7-0f81-49b8-a40c-2d095913ca6b",
+  "data": {
+    "lessonId": "42",
+    "repositoryId": "5",
+    "userId": "100",
+    "completedAt": "2026-10-25T14:30:00.000Z"
+  }
+}

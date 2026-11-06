@@ -1,0 +1,130 @@
+name: QA integral PAE
+on:
+  push:
+    branches: [develop, main]
+  pull_request:
+    branches: [develop, main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  architecture-integration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: pae_test
+          POSTGRES_PASSWORD: ephemeral-ci-fixture-only
+          POSTGRES_DB: postgres
+        ports:
+          - 5435:5432
+        options: >-
+          --label com.docker.compose.project=pruebas_pae
+          --health-cmd "pg_isready -U pae_test -d postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm ci --ignore-scripts
+      - run: npm ci --ignore-scripts --prefix backend/services/community-service
+      - run: npm ci --ignore-scripts --prefix backend/services/learning-service
+      - run: >-
+          npx c8 --all --include "backend/services/**/src/**/*.js" --include "backend/services/**/scripts/**/*.js" --include "scripts/**/*.mjs" --exclude "**/test/**" --exclude "**/tests/**" --reporter=lcov --reporter=json-summary --reports-dir=coverage/architecture npm run test:docker
+        env:
+          PAE_TEST_DB_CONTAINER: ${{ job.services.postgres.id }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: architecture-coverage
+          path: coverage/architecture/
+
+  qa:
+    needs: architecture-integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      QA_BROWSER_CHANNEL: chromium
+      QA_BROWSER_COVERAGE: '1'
+      NODE_V8_COVERAGE: ${{ github.workspace }}/coverage/host-v8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm ci --ignore-scripts
+      - name: Install service dependencies
+        run: |
+          for service in auth community content exam learning quality; do
+            npm ci --ignore-scripts --prefix backend/services/$service-service
+          done
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:coverage
+      - run: npm ci --ignore-scripts --prefix frontend
+      - run: node scripts/frontend-coverage.mjs
+      - run: npm run qa:up
+      - name: Wait for API readiness
+        run: |
+          for attempt in $(seq 1 40); do
+            if curl --fail --silent http://127.0.0.1:13000/api/auth/health && curl --fail --silent http://127.0.0.1:13000/api/community/health; then exit 0; fi
+            sleep 2
+          done
+          exit 1
+      - run: npm run test:qa
+      - run: npm run test:qa:security
+      - run: node tests/qa/juan-integration.mjs
+      - run: node tests/qa/learning-regressions.mjs
+      - run: node tests/qa/live-learning.mjs
+      - run: node tests/qa/content-lifecycle.mjs
+      - run: node tests/qa/auth-lifecycle.mjs
+      - run: node tests/qa/evaluation-lifecycle.mjs
+      - run: node tests/qa/platform-lifecycle.mjs
+      - run: node tests/qa/browser-modules.mjs
+      - run: node tests/qa/browser-exam.mjs
+      - run: node tests/qa/browser-forums.mjs
+      - run: node tests/qa/browser-authoring.mjs
+      - run: node tests/qa/operational-probes.mjs
+      - run: node tests/qa/community-management.mjs
+      - run: node tests/qa/proxy-recovery.mjs
+      - run: node scripts/browser-coverage.mjs
+        if: always()
+      - run: npm run qa:coverage
+        if: always()
+      - run: npm run qa:host-coverage
+        if: always()
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: qa-evidence
+          path: |
+            test-results/qa/
+            coverage/unit/
+            coverage/jest/
+            coverage/host/
+            coverage/frontend/
+            coverage/browser/
+            coverage/qa/
+            docs/estabilizacion/RESULTADOS_PRUEBAS.md
+      - uses: actions/download-artifact@v4
+        with:
+          name: architecture-coverage
+          path: coverage/architecture/
+      - name: SonarQube analysis with coverage
+        # The organization's plan supports main and PR analysis, not branch gates.
+        # develop still runs the complete test/coverage matrix and is reviewed via PR.
+        if: success() && (github.ref == 'refs/heads/main' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository))
+        uses: SonarSource/sonarqube-scan-action@d209202bc7d53ff1cc128f7f907dac145c9d6ae9 # v8
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN || secrets.PAESOFTK }}
+        with:
+          args: >-
+            -Dsonar.qualitygate.wait=true
+      - name: Explain branch analysis availability
+        if: success() && github.event_name != 'pull_request' && github.ref != 'refs/heads/main'
+        run: echo "::notice::This Sonar organization does not support non-main branch gates. Tests and coverage ran; see PR and main analyses for Sonar results. No branch gate is claimed."
+      - run: npm run qa:stop
+        if: always()

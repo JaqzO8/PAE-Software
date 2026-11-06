@@ -11,6 +11,7 @@ const StudySetting = require('./StudySetting');
 const PlanningSetting = require('./PlanningSetting');
 const StudyPreference = require('./StudyPreference');
 const StudyReminder = require('./StudyReminder');
+const OutboxEvent = require('./OutboxEvent');
 
 // ========================================
 // RELACIONES
@@ -153,6 +154,7 @@ module.exports = {
     PlanningSetting,
     StudyPreference,
     StudyReminder,
+    OutboxEvent,
     initializeCategories,
     initializeStudySettings,
     initializePlanningSettings,

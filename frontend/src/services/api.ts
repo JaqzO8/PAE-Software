@@ -34,7 +34,7 @@ api.interceptors.request.use(
     return config;
   },
   (error: AxiosError) => {
-    console.error('❌ [API Request Error]', error);
+    console.error('API request failed', { code: error.code });
     return Promise.reject(error);
   }
 );
@@ -60,7 +60,8 @@ api.interceptors.response.use(
     }
 
     // Error 401: Token expirado o inválido
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    const isCredentialRequest = /^\/?auth\/(login|register|mfa\/complete|quick-login)(?:\?|$)/.test(originalRequest?.url || '');
+    if (error.response?.status === 401 && originalRequest && !isCredentialRequest && localStorage.getItem('token') && !originalRequest._retry) {
       originalRequest._retry = true;
 
       try {
@@ -84,7 +85,7 @@ api.interceptors.response.use(
         return api(originalRequest);
       } catch (refreshError) {
         // Si el refresh falla, limpiar sesión y redirigir
-        console.error('Error al refrescar token:', refreshError);
+        console.error('No se pudo renovar la sesión');
         
         localStorage.removeItem('token');
         localStorage.removeItem('user');

@@ -5,6 +5,7 @@
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
+    "migrate": "node scripts/migrate.js",
     "dev": "nodemon src/index.js",
     "test": "jest",
     "test:unit:favorites": "jest src/tests/rq55/rq55.uni01.test.js",

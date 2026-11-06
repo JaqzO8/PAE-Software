@@ -9,11 +9,11 @@ Se usaron las cuatro guías de implementación adjuntas. Algunos apartados comun
 | Integrante | Dominio y módulos | Punto de continuación |
 |---|---|---|
 | Richar | Identidad (M1) y plataforma/UI (M8) | `auth-service/src/app.js`, autenticación, sesiones, despliegue y CI |
-| Juan | Contenido (M2), Planificación (M5) | `content-service/src/app.js`, futura extracción a `learning-service/src/modules/planning` |
+| Juan | Contenido (M2), Planificación (M5) | `content-service/src/app.js`, `learning-service/src/modules/planning` |
 | Amelia | Evaluación (M3), Seguimiento (M4), composición de Aprendizaje | `exam-service/src/app.js`, `learning-service/src/modules/tracking` |
 | José | Comunidad (M6), Gamificación (M7) | `community-service/src/domain`, `application`, `infrastructure`, `bootstrap`; `learning-service/src/modules/gamification` |
 
-Aprendizaje es **un servicio y una base de datos**, con tres módulos internos. Quality/Sonar sigue siendo una herramienta técnica; no es satisfacción estudiantil ni un sexto dominio académico. Analytics/notification heredados no se presentan como servicios funcionales.
+Aprendizaje es **un servicio y una base de datos**, con tres módulos internos. Planificación ya tiene migración `002_planning.sql`, repositorio PostgreSQL y rutas autenticadas bajo `/api/learning/planning`; el endpoint de Contenido se conserva solo para transición y no es el destino nuevo del frontend. Quality/Sonar sigue siendo una herramienta técnica; no es satisfacción estudiantil ni un sexto dominio académico. Analytics/notification heredados no se presentan como servicios funcionales.
 
 ```mermaid
 flowchart LR
@@ -24,7 +24,7 @@ flowchart LR
     GW --> CM[Comunidad]
     CM -->|DTO público y destinatario| ID
     EV -. ResultadoConfirmado.v1 pendiente de productor .-> AP[Aprendizaje: Seguimiento / Planificación / Gamificación]
-    CO -. LeccionCompletada.v1 pendiente .-> AP
+    CO -->|LeccionCompletada.v1 / Outbox| AP
     AP --> LP[(Base learning_pilot)]
 ```
 
@@ -70,9 +70,9 @@ El consumidor exige ResultadoConfirmado.v1 y una regla habilitada con ID, versi�
 
 Una transacción guarda inbox, movimiento en el libro mayor, saldo y evento en Outbox. La clave única `(source_type, source_id, user_id, rule_id, rule_version)` impide otorgar dos veces el mismo premio incluso si cambia `eventId`. Reutilizar un `eventId` con contenido distinto falla. Un error al escribir Outbox revierte toda la concesión. El saldo se puede cotejar con `SUM(ledger.points)`.
 
-El piloto solo admite la primera versión de un resultado confirmado. Recalificaciones y compensaciones requieren política acordada y otra vertical. El publicador de Outbox, broker, cuarentena, reintentos operativos y consumidor de notificaciones todavía no están implementados. Guardar un evento pendiente no equivale a entregarlo.
+El piloto solo admite la primera versión de un resultado confirmado. Recalificaciones y compensaciones requieren política acordada y otra vertical. El módulo de gamificación todavía requiere publicador/broker operativo propio; en Contenido, el Outbox de publicación/finalización ya tiene worker HTTP opcional, reintentos y consumidores contractuales. Guardar un evento pendiente no equivale a entregarlo.
 
-**Autoridad actual:** los puntos/logros visibles siguen en Evaluación; planificación sigue en Contenido. No hay doble escritura de datos reales. Antes de migrar se necesitan copia, comparación por usuario, estrategia de corte y rollback, y retirada explícita de las escrituras antiguas.
+**Autoridad actual:** los puntos/logros visibles siguen en Evaluación; las nuevas lecturas/escrituras de planificación usan `learning-service` y su esquema `planning`, mientras el endpoint histórico de Contenido queda para transición. No hay doble escritura desde el frontend. Antes de retirar el endpoint histórico se necesitan copia, comparación por usuario, estrategia de corte y rollback.
 
 ## Trazabilidad y siguiente trabajo
 

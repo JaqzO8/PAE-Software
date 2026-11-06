@@ -264,8 +264,8 @@ export const updateProfile = async (data: UpdateProfileData): Promise<UserProfil
     
     return updatedUser;
   } catch (error) {
-    console.warn("🔴 API Error (Update Profile), usando mock", error);
-    return updateProfileMock(data);
+    console.warn("No se pudo guardar el perfil", error);
+    throw error;
   }
 };
 
@@ -290,7 +290,7 @@ export const logoutAllSessions = async (): Promise<void> => {
   try {
     await authServices.logoutAllSessions();
   } catch (error) {
-    console.warn("🔴 API Error (Logout All), usando mock", error);
-    return logoutAllSessionsMock();
+    console.warn("No se pudieron cerrar las sesiones", error);
+    throw error;
   }
 };

@@ -1,4 +1,6 @@
-const jwt = require('jsonwebtoken');
+const { verifySession } = require('../middlewares/authMiddleware');
+const { ChallengeRoom, TriviaRoom } = require('../models');
+const { isParticipant, deliver } = require('./sessionDelivery');
 const { Server } = require('socket.io');
 const config = require('../config/env');
 
@@ -9,6 +11,8 @@ const normalizeRoomId = (roomId) => {
     const value = String(roomId || '').trim();
     return /^[0-9]+$/.test(value) ? value : null;
 };
+
+const tokenFor = socket => socket.handshake.auth?.token;
 
 const attachLearningSocket = (server) => {
     const allowedOrigins = [
@@ -30,19 +34,19 @@ const attachLearningSocket = (server) => {
         },
     });
 
-    io.use((socket, next) => {
+    io.use(async (socket, next) => {
         const token = socket.handshake.auth?.token;
         if (!token) return next(new Error('Token requerido'));
 
         try {
-            socket.user = jwt.verify(token, config.JWT_SECRET);
+            socket.user = await verifySession(token);
             return next();
         } catch (error) {
             return next(new Error('Token invalido'));
         }
     });
 
-    io.on('connection', (socket) => {
+    io.on('connection', async (socket) => {
         if (io.engine.clientsCount > config.SOCKET_MAX_CONNECTIONS) {
             socket.emit('system:busy', { message: 'Servicio en vivo ocupado. Intenta nuevamente en unos segundos.' });
             socket.disconnect(true);
@@ -54,74 +58,72 @@ const attachLearningSocket = (server) => {
             connectedAt: Date.now(),
         });
 
-        socket.join('learning:lobby');
-
-        socket.on('challenge:join-room', (roomId) => {
+        socket.on('challenge:join-room', async (roomId) => {
             const safeRoomId = normalizeRoomId(roomId);
             if (!safeRoomId) return;
-            socket.join(`challenge:${safeRoomId}`);
+            try {
+                const user = await verifySession(tokenFor(socket));
+                const room = await ChallengeRoom.findByPk(safeRoomId);
+                if (isParticipant(room, user.id)) await socket.join(`challenge:${safeRoomId}`);
+            } catch { socket.disconnect(true); }
         });
 
-        socket.on('challenge:leave-room', (roomId) => {
+        socket.on('challenge:leave-room', async (roomId) => {
             const safeRoomId = normalizeRoomId(roomId);
             if (!safeRoomId) return;
-            socket.leave(`challenge:${safeRoomId}`);
+            try { await socket.leave(`challenge:${safeRoomId}`); }
+            catch { socket.disconnect(true); }
         });
 
-        socket.on('trivia:join-room', (roomId) => {
+        socket.on('trivia:join-room', async (roomId) => {
             const safeRoomId = normalizeRoomId(roomId);
             if (!safeRoomId) return;
-            socket.join(`trivia:${safeRoomId}`);
+            try {
+                const user = await verifySession(tokenFor(socket));
+                const room = await TriviaRoom.findByPk(safeRoomId);
+                if (isParticipant(room, user.id)) await socket.join(`trivia:${safeRoomId}`);
+            } catch { socket.disconnect(true); }
         });
 
-        socket.on('trivia:leave-room', (roomId) => {
+        socket.on('trivia:leave-room', async (roomId) => {
             const safeRoomId = normalizeRoomId(roomId);
             if (!safeRoomId) return;
-            socket.leave(`trivia:${safeRoomId}`);
+            try { await socket.leave(`trivia:${safeRoomId}`); }
+            catch { socket.disconnect(true); }
         });
 
         socket.on('disconnect', () => {
             activeConnections.delete(socket.id);
         });
+        try { await socket.join('learning:lobby'); }
+        catch { socket.disconnect(true); }
     });
 
     ioInstance = io;
     return io;
 };
 
-const emitChallengeRoomsUpdated = (payload) => {
+async function publish(channel, event, payload, model, roomId) {
     if (!ioInstance) return;
-    ioInstance.to('learning:lobby').emit('challenge:rooms-updated', payload);
+    try {
+        const room = model ? await model.findByPk(roomId) : undefined;
+        if (model && !room) return;
+        await deliver({ io: ioInstance, channel, event, payload, verifySession, room });
+    } catch { console.error('Realtime update unavailable'); }
+}
+const emitChallengeRoomsUpdated = payload => publish('learning:lobby', 'challenge:rooms-updated', payload);
+const emitTriviaRoomsUpdated = payload => publish('learning:lobby', 'trivia:rooms-updated', payload);
+const emitChallengeRoomUpdated = (id, payload) => {
+    void publish(`challenge:${id}`, 'challenge:room-updated', payload, ChallengeRoom, id);
+    void emitChallengeRoomsUpdated(payload);
 };
-
-const emitChallengeRoomUpdated = (roomId, payload) => {
-    if (!ioInstance) return;
-    ioInstance.to(`challenge:${roomId}`).emit('challenge:room-updated', payload);
-    emitChallengeRoomsUpdated(payload);
+const emitTriviaRoomUpdated = (id, payload) => {
+    void publish(`trivia:${id}`, 'trivia:room-updated', payload, TriviaRoom, id);
+    void emitTriviaRoomsUpdated(payload);
 };
-
-const emitChallengeGameUpdated = (roomId, payload) => {
-    if (!ioInstance) return;
-    ioInstance.to(`challenge:${roomId}`).emit('challenge:game-updated', payload);
-    ioInstance.to('learning:lobby').emit('challenge:game-updated', payload);
-};
-
-const emitTriviaRoomsUpdated = (payload) => {
-    if (!ioInstance) return;
-    ioInstance.to('learning:lobby').emit('trivia:rooms-updated', payload);
-};
-
-const emitTriviaRoomUpdated = (roomId, payload) => {
-    if (!ioInstance) return;
-    ioInstance.to(`trivia:${roomId}`).emit('trivia:room-updated', payload);
-    emitTriviaRoomsUpdated(payload);
-};
-
-const emitTriviaGameUpdated = (roomId, payload) => {
-    if (!ioInstance) return;
-    ioInstance.to(`trivia:${roomId}`).emit('trivia:game-updated', payload);
-    ioInstance.to('learning:lobby').emit('trivia:game-updated', payload);
-};
+// Game state is private to current room participants; never send it to the lobby.
+const emitChallengeGameUpdated = (id, payload) => publish(`challenge:${id}`, 'challenge:game-updated', payload, ChallengeRoom, id);
+const emitTriviaGameUpdated = (id, payload) => publish(`trivia:${id}`, 'trivia:game-updated', payload, TriviaRoom, id);
 
 module.exports = {
     attachLearningSocket,

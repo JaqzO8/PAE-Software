@@ -62,8 +62,9 @@ const OpenReview = () => {
   }, [reviews]);
 
   const saveReview = async (review: OpenAnswerReview) => {
-    const puntaje = Number(scores[review.id_revision]);
-    if (!Number.isFinite(puntaje) || puntaje < 0 || puntaje > 5) {
+    const score = scores[review.id_revision]?.trim();
+    const puntaje = Number(score);
+    if (!score || !Number.isFinite(puntaje) || puntaje < 0 || puntaje > 5) {
       toast({
         variant: "destructive",
         title: "Puntaje invalido",
@@ -148,8 +149,9 @@ const OpenReview = () => {
                 </div>
                 <div className="grid w-full grid-cols-[96px_1fr] gap-2 md:w-72">
                   <div className="space-y-2">
-                    <Label>Puntaje</Label>
+                    <Label htmlFor={`score-${review.id_revision}`}>Puntaje</Label>
                     <Input
+                      id={`score-${review.id_revision}`}
                       type="number"
                       min={0}
                       max={5}
@@ -190,8 +192,9 @@ const OpenReview = () => {
                   </div>
                 )}
                 <div className="space-y-2">
-                  <Label>Feedback</Label>
+                  <Label htmlFor={`feedback-${review.id_revision}`}>Feedback</Label>
                   <Textarea
+                    id={`feedback-${review.id_revision}`}
                     className="min-h-28"
                     value={feedback[review.id_revision] || ""}
                     onChange={(event) => setFeedback((prev) => ({ ...prev, [review.id_revision]: event.target.value }))}

@@ -1,5 +1,11 @@
 const { fail, positiveId, requireActive, requireOwner, requireNotExpelled, invitationExpiresAt } = require('../domain/communityPolicy');
 
+function validateMessageContent(content) {
+    if (typeof content !== 'string' || !content.trim() || content.trim().length > 1000) {
+        fail('INVALID_MESSAGE', 'El mensaje debe tener entre 1 y 1000 caracteres');
+    }
+}
+
 // Ports: unitOfWork(callback) supplies a transactional repository; clock.now() returns a Date; hash(str) returns a digest.
 function createCommunityUseCases({ unitOfWork, clock, invitationTtlMs, findStudent, hash = (str) => Buffer.from(str).toString('hex') }) {
     if (!Number.isFinite(invitationTtlMs) || invitationTtlMs <= 0) throw new Error('Invalid invitation TTL');
@@ -42,7 +48,7 @@ function createCommunityUseCases({ unitOfWork, clock, invitationTtlMs, findStude
     };
     return {
         publishMessage: ({ communityId, actor, content, clientId }) => inCommunity(communityId, async (repo, community) => {
-            if (typeof content !== 'string' || !content.trim() || content.trim().length > 1000) fail('INVALID_MESSAGE', 'El mensaje debe tener entre 1 y 1000 caracteres');
+            validateMessageContent(content);
             const member = await repo.findMember(community.id_comunidad, positiveId(actor.id));
             requireNotExpelled(member);
             if (!member?.activo) fail('MEMBERSHIP_REQUIRED', 'No eres miembro de esta comunidad', 403);
@@ -74,7 +80,7 @@ function createCommunityUseCases({ unitOfWork, clock, invitationTtlMs, findStude
                 if (!author && (typeof reason !== 'string' || !reason.trim() || reason.length > 1000)) fail('REASON_REQUIRED', 'Indica el motivo de moderación');
                 return repo.saveMessage(message, { contenido: '[Mensaje retirado]', fecha_eliminacion: clock.now(), eliminado_por: positiveId(actor.id), motivo_eliminacion: author ? 'Retirado por el autor' : reason.trim(), version: message.version + 1 });
             }
-            if (typeof content !== 'string' || !content.trim() || content.trim().length > 1000) fail('INVALID_MESSAGE', 'El mensaje debe tener entre 1 y 1000 caracteres');
+            validateMessageContent(content);
             return repo.saveMessage(message, { contenido: content.trim(), editado: true, fecha_edicion: clock.now(), version: message.version + 1 });
         }),
         async create({ actor, input }) {

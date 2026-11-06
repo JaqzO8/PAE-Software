@@ -1,5 +1,6 @@
 const TokenService = require('../services/tokenService');
-const { Usuario } = require('../models');
+const { Usuario, Rol, Sesion } = require('../models');
+const { createHash } = require('node:crypto');
 
 /**
  * Middleware para verificar JWT token
@@ -16,22 +17,25 @@ const verifyToken = async (req, res, next) => {
             });
         }
 
-        const { valid, decoded, error } = await TokenService.verifyToken(token);
+        const { valid, decoded, error, status } = await TokenService.verifyToken(token);
 
         if (!valid) {
-            return res.status(401).json({
+            return res.status(status || 401).json({
                 success: false,
                 message: error || 'Token inválido',
             });
         }
 
-        // Adjuntar datos del usuario a la request
-        req.user = decoded;
+        const user = await Usuario.findByPk(decoded.id, { include: [{ model: Rol, as: 'rol' }] });
+        const fingerprint = createHash('sha256').update(token).digest('hex');
+        const session = await Sesion.findOne({ where: { id_usuario: decoded.id, token_sesion: fingerprint, activa: true } });
+        if (!user?.activo || !session) return res.status(401).json({ success: false, message: 'La sesión ya no está activa' });
+        req.user = { ...decoded, rol: user.rol.nombre_rol };
         req.token = token;
         next();
     } catch (error) {
-        console.error('Error en verifyToken middleware:', error);
-        return res.status(500).json({
+        console.error('Session verification unavailable', { name: error.name });
+        return res.status(503).json({
             success: false,
             message: 'Error al verificar token',
         });

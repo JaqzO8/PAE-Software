@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Bell, CalendarDays, CheckCircle2, Clock, Play, Save } from "lucide-react";
+import { Bell, CalendarDays, CheckCircle2, Clock, Play, Save, XCircle } from "lucide-react";
 import {
   Badge,
   Button,
@@ -16,6 +16,9 @@ import {
   generateStudyReminders,
   getPlanningOverview,
   updateReminderStatus,
+  cancelReminder,
+  transitionPomodoro,
+  type PomodoroState,
   updateStudyPreference,
   type PlanningOverview,
   type StudyPreference,
@@ -43,6 +46,7 @@ const Planning = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [pomodoroSeconds, setPomodoroSeconds] = useState(0);
   const [isPomodoroRunning, setIsPomodoroRunning] = useState(false);
+  const [pomodoroState, setPomodoroState] = useState<PomodoroState>("idle");
 
   const subjectsText = useMemo(() => preference?.subjects.join(", ") || "", [preference?.subjects]);
 
@@ -74,6 +78,25 @@ const Planning = () => {
     return () => window.clearInterval(interval);
   }, [isPomodoroRunning, pomodoroSeconds]);
 
+  useEffect(() => {
+    if (pomodoroSeconds === 0 && isPomodoroRunning) {
+      setIsPomodoroRunning(false);
+      setPomodoroState("completed");
+      void transitionPomodoro("running", "finish", 0);
+    }
+  }, [pomodoroSeconds]);
+
+  const togglePomodoro = async () => {
+    const action = isPomodoroRunning ? "pause" : pomodoroState === "paused" ? "resume" : "start";
+    try {
+      const result = await transitionPomodoro(pomodoroState, action, 0);
+      setPomodoroState(result.currentState);
+      setIsPomodoroRunning(result.currentState === "running");
+    } catch {
+      toast({ variant: "destructive", title: "No se pudo actualizar el Pomodoro" });
+    }
+  };
+
   const toggleDay = (day: number) => {
     setPreference((current) => {
       if (!current) return current;
@@ -89,21 +112,39 @@ const Planning = () => {
 
   const savePreference = async () => {
     if (!preference) return;
-    const saved = await updateStudyPreference(preference);
-    setPreference(saved);
-    toast({ title: "Preferencias guardadas" });
-    await loadOverview();
+    try {
+      const saved = await updateStudyPreference(preference);
+      setPreference(saved);
+      toast({ title: "Preferencias guardadas" });
+      await loadOverview();
+    } catch {
+      toast({ variant: "destructive", title: "No se pudieron guardar las preferencias" });
+    }
   };
 
   const createReminders = async () => {
-    const reminders = await generateStudyReminders();
-    toast({ title: "Recordatorios generados", description: `${reminders.length} sesiones quedaron programadas.` });
-    await loadOverview();
+    try {
+      const reminders = await generateStudyReminders();
+      toast({ title: "Recordatorios generados", description: `${reminders.length} sesiones quedaron programadas.` });
+      await loadOverview();
+    } catch {
+      toast({ variant: "destructive", title: "No se pudieron generar recordatorios" });
+    }
   };
 
   const completeReminder = async (id: number) => {
     await updateReminderStatus(id, "completado");
     await loadOverview();
+  };
+
+  const cancelStudyReminder = async (id: number) => {
+    try {
+      await cancelReminder(id);
+      toast({ title: "Recordatorio cancelado" });
+      await loadOverview();
+    } catch {
+      toast({ variant: "destructive", title: "No se pudo cancelar el recordatorio" });
+    }
   };
 
   const pomodoroLabel = `${Math.floor(pomodoroSeconds / 60).toString().padStart(2, "0")}:${(pomodoroSeconds % 60).toString().padStart(2, "0")}`;
@@ -170,6 +211,16 @@ const Planning = () => {
                 })}
               />
             </label>
+            <label className="space-y-2 text-sm font-medium md:col-span-2">
+              Zona horaria
+              <Input
+                value={preference.timeZone}
+                onChange={(event) => setPreference({ ...preference, timeZone: event.target.value })}
+                placeholder="America/Lima"
+                aria-label="Zona horaria de la planificación"
+              />
+              <span className="text-xs text-muted-foreground">Las fechas y recordatorios se calculan en esta zona.</span>
+            </label>
             <label className="flex items-center gap-2 text-sm font-medium">
               <Checkbox
                 checked={preference.remindersEnabled}
@@ -194,7 +245,7 @@ const Planning = () => {
                 Enfoque {overview.settings.pomodoroFocusMinutes} min | Descanso {overview.settings.pomodoroBreakMinutes} min
               </p>
             </div>
-            <Button type="button" className="w-full" variant="brand" onClick={() => setIsPomodoroRunning((value) => !value)}>
+            <Button type="button" className="w-full" variant="brand" onClick={togglePomodoro}>
               <Play className="h-4 w-4" />
               {isPomodoroRunning ? "Pausar" : "Iniciar"}
             </Button>
@@ -241,10 +292,16 @@ const Planning = () => {
                 <p className="font-semibold text-primary-contrast">{reminder.titulo}</p>
                 <p className="text-sm text-muted-foreground">{formatDateTime(reminder.programado_para)}</p>
               </div>
-              <Button type="button" size="sm" variant="outline" onClick={() => completeReminder(reminder.id_recordatorio)}>
-                <CheckCircle2 className="h-4 w-4" />
-                Completar
-              </Button>
+              <div className="flex gap-2">
+                <Button type="button" size="sm" variant="outline" onClick={() => completeReminder(reminder.id_recordatorio)}>
+                  <CheckCircle2 className="h-4 w-4" />
+                  Completar
+                </Button>
+                <Button type="button" size="sm" variant="ghost" onClick={() => cancelStudyReminder(reminder.id_recordatorio)}>
+                  <XCircle className="h-4 w-4" />
+                  Cancelar
+                </Button>
+              </div>
             </div>
           ))}
         </CardContent>

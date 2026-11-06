@@ -9,7 +9,7 @@ class ChallengeController {
             const userId = req.user.id;
 
             const community = await Comunidad.findByPk(id);
-            if (!community || community.profesor_id !== userId) {
+            if (!community || String(community.profesor_id) !== String(userId)) {
                 return res.status(403).json({ success: false, message: 'No autorizado' });
             }
 
@@ -51,7 +51,7 @@ class ChallengeController {
             const userId = req.user.id;
 
             const community = await Comunidad.findByPk(id);
-            if (community.profesor_id !== userId) {
+            if (!community || String(community.profesor_id) !== String(userId)) {
                 return res.status(403).json({ success: false, message: 'No autorizado' });
             }
 

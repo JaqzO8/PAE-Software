@@ -81,7 +81,7 @@ describe('TC-15-INT-02 - Revocar acceso compartido', () => {
       data: repositoryMock,
     });
 
-    // 2) GET público posterior: getById filtra por activo=true y publico=true
+    // 2) Una sesión ajena solo puede leer repositorios públicos o propios.
     Repository.findOne.mockResolvedValueOnce(null);
 
     await RepositoryController.getById(reqGetById, resGetById, next);
@@ -91,7 +91,7 @@ describe('TC-15-INT-02 - Revocar acceso compartido', () => {
         where: {
           id_repositorio: 5,
           activo: true,
-          publico: true,
+          [require('sequelize').Op.or]: [{ publico: true }, { id_profesor: reqGetById.user.id }],
         },
       })
     );

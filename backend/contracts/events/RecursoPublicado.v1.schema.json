@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:pae:event:RecursoPublicado:v1",
+  "title": "RecursoPublicado.v1 — Publicación de recurso académico en repositorio",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["eventId", "type", "schemaVersion", "producer", "occurredAt", "correlationId", "data"],
+  "properties": {
+    "eventId": { "type": "string", "format": "uuid" },
+    "type": { "const": "RecursoPublicado.v1" },
+    "schemaVersion": { "const": 1 },
+    "producer": { "const": "content" },
+    "occurredAt": { "type": "string", "format": "date-time", "pattern": "Z$" },
+    "correlationId": { "type": "string", "format": "uuid" },
+    "data": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["resourceId", "repositoryId", "teacherId", "title", "resourceType", "isPublic"],
+      "properties": {
+        "resourceId": { "type": "string", "pattern": "^[1-9][0-9]{0,18}$" },
+        "repositoryId": { "type": "string", "pattern": "^[1-9][0-9]{0,18}$" },
+        "teacherId": { "type": "string", "pattern": "^[1-9][0-9]{0,18}$" },
+        "title": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "resourceType": { "enum": ["pdf", "video", "audio", "imagen", "enlace", "otro"] },
+        "isPublic": { "type": "boolean" }
+      }
+    }
+  }
+}

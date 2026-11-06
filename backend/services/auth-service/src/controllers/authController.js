@@ -1,3 +1,4 @@
+const { deviceName } = require('../utils/deviceInfo');
 const { Usuario, Rol, SolicitudDocente, Sesion } = require('../models');
 const TokenService = require('../services/tokenService');
 const SessionService = require('../services/sessionService');
@@ -8,14 +9,11 @@ const {
     clearLoginAttempts,
     atomicConsumeResetToken,
     storeMfaChallenge,
-    getMfaChallenge,
-    incrementMfaAttempts,
-    atomicConsumeMfaChallenge,
+    verifyMfaChallenge,
     redis,
 } = require('../config/redis');
 const config = require('../config/env');
 const { determinarRolInicial, esRolPrivilegiado } = require('../domain/politicaRoles');
-const { validarCodigoMfa } = require('../domain/politicaSesion');
 
 class AuthController {
     static toAuthUser(usuario) {
@@ -98,7 +96,7 @@ class AuthController {
 
             // Si el usuario marcó intención docente, registramos solicitud de habilitación pendiente
             let teacherRequestPending = false;
-            if (Boolean(isTeacher)) {
+            if (isTeacher === true) {
                 try {
                     await SolicitudDocente.create({
                         usuario_id: usuario.id_usuario,
@@ -120,7 +118,7 @@ class AuthController {
             });
 
             const deviceInfo = {
-                device: req.headers['user-agent']?.match(/\(([^)]+)\)/)?.[1] || 'Desconocido',
+                device: deviceName(req.headers['user-agent']) || 'Desconocido',
                 ip: req.ip || req.connection?.remoteAddress,
                 userAgent: req.headers['user-agent'],
             };
@@ -192,7 +190,7 @@ class AuthController {
                 await SessionService.logSessionHistory(
                     usuario.id_usuario,
                     {
-                        device: req.headers['user-agent']?.match(/\(([^)]+)\)/)?.[1],
+                        device: deviceName(req.headers['user-agent']),
                         ip: req.ip || req.connection?.remoteAddress,
                     },
                     'login',
@@ -240,7 +238,7 @@ class AuthController {
             });
 
             const deviceInfo = {
-                device: req.headers['user-agent']?.match(/\(([^)]+)\)/)?.[1] || 'Desconocido',
+                device: deviceName(req.headers['user-agent']) || 'Desconocido',
                 ip: req.ip || req.connection?.remoteAddress,
                 userAgent: req.headers['user-agent'],
             };
@@ -280,38 +278,11 @@ class AuthController {
                 });
             }
 
-            const challengeId = decoded.challengeId;
-            const challengeData = await getMfaChallenge(challengeId);
-            if (!challengeData) {
-                return res.status(400).json({
+            const verification = await verifyMfaChallenge(decoded.challengeId, code, decoded.id);
+            if (verification.status !== 'accepted') {
+                return res.status(verification.status === 'blocked' ? 429 : 400).json({
                     success: false,
-                    message: 'El código ha expirado o ya fue consumido',
-                });
-            }
-
-            const validacion = validarCodigoMfa(code, challengeData.otpCode, challengeData.attempts || 0);
-            if (!validacion.valido) {
-                if (validacion.bloqueado) {
-                    await atomicConsumeMfaChallenge(challengeId);
-                    return res.status(429).json({
-                        success: false,
-                        message: validacion.motivo,
-                    });
-                } else {
-                    await incrementMfaAttempts(challengeId);
-                    return res.status(400).json({
-                        success: false,
-                        message: validacion.motivo,
-                    });
-                }
-            }
-
-            // Consumo atómico: garantiza que en carreras concurrentes solo uno tenga éxito
-            const consumed = await atomicConsumeMfaChallenge(challengeId);
-            if (!consumed) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'El código ya fue utilizado',
+                    message: verification.status === 'blocked' ? 'Demasiados intentos. Solicita otro código.' : 'Código inválido, expirado o ya utilizado',
                 });
             }
 
@@ -334,7 +305,7 @@ class AuthController {
             });
 
             const deviceInfo = {
-                device: req.headers['user-agent']?.match(/\(([^)]+)\)/)?.[1] || 'Desconocido (MFA)',
+                device: deviceName(req.headers['user-agent']) || 'Desconocido (MFA)',
                 ip: req.ip || req.connection?.remoteAddress,
                 userAgent: req.headers['user-agent'],
             };
@@ -362,7 +333,7 @@ class AuthController {
             await TokenService.revokeToken(token);
 
             const deviceInfo = {
-                device: req.headers['user-agent']?.match(/\(([^)]+)\)/)?.[1],
+                device: deviceName(req.headers['user-agent']),
                 ip: req.ip || req.connection?.remoteAddress,
             };
             await SessionService.deactivateSession(token, deviceInfo);
@@ -391,6 +362,7 @@ class AuthController {
                 rol,
             });
 
+            await SessionService.rotateSession(id, req.token, newToken);
             await TokenService.revokeToken(req.token);
 
             res.status(200).json({
@@ -433,61 +405,10 @@ class AuthController {
 
     /**
      * POST /api/auth/quick-login
-     * Login social simplificado: NUNCA otorga roles docentes/admin a cuentas nuevas (RIC-01)
+     * El acceso social requiere un proveedor que verifique identidad; no aceptar un correo como prueba.
      */
-    static async quickLogin(req, res, next) {
-        try {
-            const { email, nombres = 'Usuario', apellidos = 'PAE', provider = 'google' } = req.body;
-
-            if (!email) {
-                return res.status(400).json({ success: false, message: 'Email requerido' });
-            }
-
-            const normalizedEmail = String(email).toLowerCase().trim();
-
-            let usuario = await Usuario.findOne({
-                where: { email: normalizedEmail },
-                include: [{ model: Rol, as: 'rol' }],
-            });
-
-            // Si es un usuario nuevo, el rol es SIEMPRE estudiante (prohibido elevar a docente)
-            if (!usuario) {
-                const rol = await Rol.findOne({ where: { nombre_rol: 'estudiante' } });
-                usuario = await Usuario.create({
-                    nombres: String(nombres).trim(),
-                    apellidos: String(apellidos).trim(),
-                    email: normalizedEmail,
-                    password_hash: crypto.randomBytes(24).toString('hex'),
-                    rol_id: rol.id_rol,
-                    primer_ingreso: true,
-                    activo: true,
-                });
-                await usuario.reload({ include: [{ model: Rol, as: 'rol' }] });
-            }
-
-            const token = TokenService.generateToken({
-                id: usuario.id_usuario,
-                identificador_unico: usuario.identificador_unico,
-                email: usuario.email,
-                rol: usuario.rol.nombre_rol,
-            });
-
-            const deviceInfo = {
-                device: `${provider} - ${req.headers['user-agent']?.match(/\(([^)]+)\)/)?.[1] || 'Desconocido'}`,
-                ip: req.ip || req.connection?.remoteAddress,
-                userAgent: req.headers['user-agent'],
-            };
-
-            await SessionService.createSession(usuario.id_usuario, deviceInfo, token);
-
-            res.status(200).json({
-                success: true,
-                user: AuthController.toAuthUser(usuario),
-                token,
-            });
-        } catch (error) {
-            next(error);
-        }
+    static quickLogin(req, res) {
+        return res.status(503).json({ success: false, code: 'SOCIAL_LOGIN_UNAVAILABLE', message: 'El acceso social no está configurado. Ingresa con tu correo y contraseña.' });
     }
 
     /**
@@ -611,7 +532,7 @@ class AuthController {
             await SessionService.logSessionHistory(
                 userId,
                 {
-                    device: req.headers['user-agent']?.match(/\(([^)]+)\)/)?.[1],
+                    device: deviceName(req.headers['user-agent']),
                     ip: req.ip || req.connection?.remoteAddress,
                 },
                 'cambio_password',
@@ -623,7 +544,7 @@ class AuthController {
             await SessionService.deactivateAllUserSessions(
                 userId,
                 {
-                    device: req.headers['user-agent']?.match(/\(([^)]+)\)/)?.[1],
+                    device: deviceName(req.headers['user-agent']),
                     ip: req.ip || req.connection?.remoteAddress,
                 }
             );
@@ -658,7 +579,7 @@ class AuthController {
                     location: session.ip_address || 'IP no disponible',
                     lastActive: session.fecha_ultimo_acceso,
                     startedAt: session.fecha_inicio,
-                    isCurrent: session.token_sesion === req.token,
+                    isCurrent: session.token_sesion === crypto.createHash('sha256').update(req.token).digest('hex'),
                 })),
                 history: historyResult.history.map((item) => ({
                     id: item.id_historial.toString(),
@@ -680,10 +601,8 @@ class AuthController {
      */
     static async logoutAll(req, res, next) {
         try {
-            const sessions = await SessionService.getUserActiveSessions(req.user.id);
-            await Promise.all(sessions.map((session) => TokenService.revokeToken(session.token_sesion)));
             await SessionService.deactivateAllUserSessions(req.user.id, {
-                device: req.headers['user-agent']?.match(/\(([^)]+)\)/)?.[1],
+                device: deviceName(req.headers['user-agent']),
                 ip: req.ip || req.connection?.remoteAddress,
             });
 
@@ -703,7 +622,7 @@ class AuthController {
             const usuario = email ? await Usuario.findOne({ where: { email } }) : null;
             let resetToken = null;
 
-            if (usuario && usuario.activo) {
+            if (usuario?.activo) {
                 resetToken = crypto.randomBytes(32).toString('hex');
                 await redis.setex(`password_reset:${resetToken}`, 900, usuario.id_usuario);
             }
@@ -749,10 +668,8 @@ class AuthController {
             await usuario.update({ password_hash: newPassword });
 
             // Revocar tokens y cerrar sesiones activas
-            const sessions = await SessionService.getUserActiveSessions(usuario.id_usuario);
-            await Promise.all(sessions.map(s => TokenService.revokeToken(s.token_sesion)));
             await SessionService.deactivateAllUserSessions(usuario.id_usuario, {
-                device: req.headers['user-agent']?.match(/\(([^)]+)\)/)?.[1],
+                device: deviceName(req.headers['user-agent']),
                 ip: req.ip || req.connection?.remoteAddress,
             });
 

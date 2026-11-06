@@ -266,7 +266,7 @@ const Trivia = () => {
             </div>
             <div>
               <p className="text-3xl font-bold text-orange-600 mb-2">
-                +{Math.floor(Math.random() * 100 + 200)}
+                No disponible
               </p>
               <p className="text-sm text-muted-foreground">
                 Trivias completadas hoy

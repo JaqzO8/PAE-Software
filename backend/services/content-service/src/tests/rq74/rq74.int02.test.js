@@ -9,6 +9,8 @@ jest.mock('fs', () => ({
 
 jest.mock('../../config/env', () => ({
   UPLOAD_PATH: 'C:/fake/uploads',
+  JWT_SECRET: process.env.JWT_SECRET,
+  RESOURCE_LINK_TTL_SECONDS: 900,
 }));
 
 jest.mock('../../models', () => ({
@@ -33,6 +35,7 @@ describe('TC-74-INT-02 - Actualizar ranking por nuevas descargas', () => {
 
   beforeEach(() => {
     reqDownload = {
+      user: { id: 17, rol: 'estudiante' },
       params: {
         id: 10,
       },
@@ -79,6 +82,7 @@ describe('TC-74-INT-02 - Actualizar ranking por nuevas descargas', () => {
     Resource.findOne.mockResolvedValue(recursoMock);
 
     await ResourceController.download(reqDownload, res, next);
+    expect(next).not.toHaveBeenCalled();
 
     expect(Resource.findOne).toHaveBeenCalled();
     expect(recursoMock.increment).toHaveBeenCalledWith('descargas');
@@ -87,7 +91,8 @@ describe('TC-74-INT-02 - Actualizar ranking por nuevas descargas', () => {
     expect(res.json).toHaveBeenCalledWith({
       success: true,
       type: 'file',
-      downloadUrl: '/content/resources/10/file',
+      downloadUrl: expect.stringMatching(/^\/content\/resources\/10\/file\?access_token=.+/),
+      expiresAt: expect.any(String),
       filename: 'Material de prueba.pdf',
     });
 

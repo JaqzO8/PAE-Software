@@ -41,6 +41,15 @@ class ResourceController {
                 return res.status(403).json({ success: false, message: 'Solo profesores pueden subir recursos' });
             }
 
+            const handle = await fs.open(req.file.path, 'r');
+            try {
+                const signature = Buffer.alloc(5);
+                const { bytesRead } = await handle.read(signature, 0, 5, 0);
+                if (bytesRead !== 5 || signature.toString('ascii') !== '%PDF-') {
+                    throw Object.assign(new Error('El archivo no tiene cabecera PDF válida'), { status: 415 });
+                }
+            } finally { await handle.close(); }
+
             const resource = await RecursoComunidad.create({
                 comunidad_id: id,
                 profesor_id: userId,
