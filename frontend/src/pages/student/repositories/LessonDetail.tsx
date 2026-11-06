@@ -105,7 +105,7 @@ export default function StudentLessonDetail() {
                 title: "Error",
                 description: error.response?.data?.message || "No se pudo cargar la leccion",
             });
-            navigate(-1);
+            await navigate(-1);
         } finally {
             setIsLoading(false);
         }

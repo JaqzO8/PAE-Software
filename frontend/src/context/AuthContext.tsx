@@ -137,9 +137,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Redirigir según rol
       const basePath = response.user.rol === 'docente' ? '/docente' : '/estudiante';
 
-      setTimeout(() => {
+      setTimeout(async () => {
         try {
-          navigate(basePath, { replace: true });
+          await navigate(basePath, { replace: true });
 
           setTimeout(() => {
             if (window.location.pathname !== basePath) {
@@ -185,7 +185,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         description: 'Has salido de tu cuenta correctamente',
       });
 
-      navigate('/', { replace: true });
+      await navigate('/', { replace: true });
     }
   }, [navigate, toast, user?.id, clearAuthData]);
 

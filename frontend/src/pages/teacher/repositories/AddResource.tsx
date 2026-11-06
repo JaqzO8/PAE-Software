@@ -84,7 +84,7 @@ export default function AddResource() {
                 description: "El recurso se subió correctamente",
             });
 
-            navigate(`/docente/repositorios/gestionar/${id}`);
+            await navigate(`/docente/repositorios/gestionar/${id}`);
         } catch (error: any) {
             toast({
                 variant: "destructive",

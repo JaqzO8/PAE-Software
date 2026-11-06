@@ -46,7 +46,7 @@ const attachLearningSocket = (server) => {
         }
     });
 
-    io.on('connection', (socket) => {
+    io.on('connection', async (socket) => {
         if (io.engine.clientsCount > config.SOCKET_MAX_CONNECTIONS) {
             socket.emit('system:busy', { message: 'Servicio en vivo ocupado. Intenta nuevamente en unos segundos.' });
             socket.disconnect(true);
@@ -58,8 +58,6 @@ const attachLearningSocket = (server) => {
             connectedAt: Date.now(),
         });
 
-        socket.join('learning:lobby');
-
         socket.on('challenge:join-room', async (roomId) => {
             const safeRoomId = normalizeRoomId(roomId);
             if (!safeRoomId) return;
@@ -70,10 +68,11 @@ const attachLearningSocket = (server) => {
             } catch { socket.disconnect(true); }
         });
 
-        socket.on('challenge:leave-room', (roomId) => {
+        socket.on('challenge:leave-room', async (roomId) => {
             const safeRoomId = normalizeRoomId(roomId);
             if (!safeRoomId) return;
-            socket.leave(`challenge:${safeRoomId}`);
+            try { await socket.leave(`challenge:${safeRoomId}`); }
+            catch { socket.disconnect(true); }
         });
 
         socket.on('trivia:join-room', async (roomId) => {
@@ -86,15 +85,18 @@ const attachLearningSocket = (server) => {
             } catch { socket.disconnect(true); }
         });
 
-        socket.on('trivia:leave-room', (roomId) => {
+        socket.on('trivia:leave-room', async (roomId) => {
             const safeRoomId = normalizeRoomId(roomId);
             if (!safeRoomId) return;
-            socket.leave(`trivia:${safeRoomId}`);
+            try { await socket.leave(`trivia:${safeRoomId}`); }
+            catch { socket.disconnect(true); }
         });
 
         socket.on('disconnect', () => {
             activeConnections.delete(socket.id);
         });
+        try { await socket.join('learning:lobby'); }
+        catch { socket.disconnect(true); }
     });
 
     ioInstance = io;

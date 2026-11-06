@@ -31,5 +31,5 @@ async function main() {
     try { await migrate(pool); console.log('Learning migrations applied'); }
     finally { await pool.end(); }
 }
-if (require.main === module) main().catch(error => { console.error(error.message); process.exitCode = 1; });
+if (require.main?.filename === __filename) main().catch(error => { console.error(error.message); process.exitCode = 1; });
 module.exports = { migrate };

@@ -28,6 +28,15 @@ for(const item of cases) {
     } catch(error) {
         results.push({id:item.id,title:item.title,status:'fallido',durationMs:performance.now()-start,actual:error.message,defect:`DEF-${item.id}`,revision});
         console.error(`FAIL ${item.id}: ${error.message}`);
+        if (item.id === 'PE-P03') {
+            // Preserve Redis lifecycle evidence before cleanup, without account data.
+            try {
+                console.error(compose('ps', '--all', '--format', 'json', 'redis', 'auth-service'));
+                console.error(compose('logs', '--no-color', '--tail', '40', 'redis'));
+            } catch (diagnosticError) {
+                console.error(`Redis recovery diagnostics unavailable: ${diagnosticError.message}`);
+            }
+        }
     }
     await saveResults(results);
 }

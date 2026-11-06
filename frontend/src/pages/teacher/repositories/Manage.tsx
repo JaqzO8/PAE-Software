@@ -52,7 +52,7 @@ const ManageRepository = () => {
                 title: "Error",
                 description: error.message || "No se pudo cargar el repositorio",
             });
-            navigate("/docente/repositorios/mis-repos");
+            await navigate("/docente/repositorios/mis-repos");
         } finally {
             setIsLoading(false);
         }
@@ -70,12 +70,12 @@ const ManageRepository = () => {
         }
     };
 
-    const handleAddResource = () => {
-        navigate(`/docente/repositorios/gestionar/${id}/agregar-recurso`);
+    const handleAddResource = async () => {
+        await navigate(`/docente/repositorios/gestionar/${id}/agregar-recurso`);
     };
 
-    const handleAddLesson = () => {
-        navigate(`/docente/repositorios/gestionar/${id}/agregar-leccion`);
+    const handleAddLesson = async () => {
+        await navigate(`/docente/repositorios/gestionar/${id}/agregar-leccion`);
     };
 
     const handleDeleteResource = async (resourceId: number) => {
