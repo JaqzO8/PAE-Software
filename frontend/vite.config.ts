@@ -31,6 +31,8 @@ export default defineConfig({
     },
   },
   build: {
+    // QA collects original-source coverage from the actual production build.
+    sourcemap: process.env.PAE_BROWSER_COVERAGE === '1' ? 'inline' : false,
     chunkSizeWarningLimit: 450,
     rollupOptions: {
       output: {

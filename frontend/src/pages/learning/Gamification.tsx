@@ -315,6 +315,11 @@ export default function GamificationPage() {
 
         <TabsContent value="actividad" className="m-0">
           <div className="space-y-3">
+            {summary.recentEvents.length === 0 && (
+              <p className="rounded-lg border border-neutral-200 p-5 text-neutral-600">
+                Aún no tienes actividad registrada. Completa una actividad para ver tu progreso aquí.
+              </p>
+            )}
             {summary.recentEvents.map((event) => (
               <Card key={event.id} className="border-neutral-200">
                 <CardContent className="flex items-center justify-between gap-4 p-4">

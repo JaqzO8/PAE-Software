@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const RepositoryController = require('../controllers/repositoryController');
 const RatingController = require('../controllers/ratingController');
-const { verifyToken, isTeacher, isAuthenticated } = require('../middlewares/authMiddleware');
+const { verifyToken, verifyOptionalToken, isTeacher, isAuthenticated } = require('../middlewares/authMiddleware');
 const { uploadCover } = require('../middlewares/uploadMiddleware');
 
 // ========================================
@@ -55,7 +55,7 @@ router.post(
  * Obtener detalles de un repositorio
  * ⚠️ Esta ruta debe ir DESPUÉS de /my para evitar que "my" sea interpretado como ID
  */
-router.get('/:id', RepositoryController.getById);
+router.get('/:id', verifyOptionalToken, RepositoryController.getById);
 
 /**
  * PUT /api/content/repositories/:id
