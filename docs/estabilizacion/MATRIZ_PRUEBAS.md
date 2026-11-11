@@ -18,104 +18,104 @@ Cargas locales acotadas; los umbrales son presupuestos de ingeniería para esta 
 
 Los fixtures quedan únicamente en el volumen qa-db y se crean con identificadores únicos; nunca se borran datos de pruebas_pae. Los límites de CPU se restauran en finally.
 
-## PU-O01 — Contraseña y OTP válidos
+## PU-O01 — Límites y alcance de MFA
 
 - Categoría: Unitarias; escenario: óptimo.
-- Objetivo/funcionalidad: Contraseña y OTP válidos.
+- Objetivo/funcionalidad: Límites y alcance de MFA.
 - Precondiciones: entorno aislado pae_qa iniciado con código de la rama; PostgreSQL y Redis disponibles, excepto durante el fallo inducido descrito. Datos sintéticos nuevos por caso, sin uso de cuentas reales.
-- Entrada: Password Test1234 y OTP 123456, cero intentos.
+- Entrada: Contraseñas límite, OTP con cero inicial e intentos 0–2.
 - Procedimiento: ejecutar `QA_CASES=PU-O01 node tests/qa/run.mjs` (PowerShell: `$env:QA_CASES='PU-O01'; node tests/qa/run.mjs`). La implementación exacta está en `tests/qa/cases.mjs`.
-- Resultado esperado/criterio de aprobación: Contraseña válida y OTP aceptado. Se comprueba mediante assertions; cualquier discrepancia falla el caso.
+- Resultado esperado/criterio de aprobación: Código válido aceptado; desafío nunca autoriza acceso regular. Se comprueba mediante assertions; cualquier discrepancia falla el caso.
 - Resultado real, estado, evidencia y defecto: véase fila PU-O01 en RESULTADOS_PRUEBAS.md y test-results/qa/results.json.
 
-## PU-P01 — Contraseña y OTP inválidos o agotados
+## PU-P01 — Bloqueo irrevocable del desafío
 
 - Categoría: Unitarias; escenario: pésimo.
-- Objetivo/funcionalidad: Contraseña y OTP inválidos o agotados.
+- Objetivo/funcionalidad: Bloqueo irrevocable del desafío.
 - Precondiciones: entorno aislado pae_qa iniciado con código de la rama; PostgreSQL y Redis disponibles, excepto durante el fallo inducido descrito. Datos sintéticos nuevos por caso, sin uso de cuentas reales.
-- Entrada: null, vacío, sin dígitos, OTP incorrecto en tercer intento.
+- Entrada: Contraseñas malformadas, secuencia de tres errores y código correcto tras agotamiento.
 - Procedimiento: ejecutar `QA_CASES=PU-P01 node tests/qa/run.mjs` (PowerShell: `$env:QA_CASES='PU-P01'; node tests/qa/run.mjs`). La implementación exacta está en `tests/qa/cases.mjs`.
-- Resultado esperado/criterio de aprobación: Todos rechazados y desafío bloqueado. Se comprueba mediante assertions; cualquier discrepancia falla el caso.
+- Resultado esperado/criterio de aprobación: Intentos restantes 2/1/0; ningún código elude el bloqueo. Se comprueba mediante assertions; cualquier discrepancia falla el caso.
 - Resultado real, estado, evidencia y defecto: véase fila PU-P01 en RESULTADOS_PRUEBAS.md y test-results/qa/results.json.
 
-## PU-O02 — Extracción de dispositivo
+## PU-O02 — Autenticación y emisión condicionada de MFA
 
 - Categoría: Unitarias; escenario: óptimo.
-- Objetivo/funcionalidad: Extracción de dispositivo.
+- Objetivo/funcionalidad: Autenticación y emisión condicionada de MFA.
 - Precondiciones: entorno aislado pae_qa iniciado con código de la rama; PostgreSQL y Redis disponibles, excepto durante el fallo inducido descrito. Datos sintéticos nuevos por caso, sin uso de cuentas reales.
-- Entrada: Agente Mozilla/5.0 (Windows NT 10.0).
+- Entrada: Tres configuraciones: sesión normal, MFA por política o por cuenta; adaptadores aislados.
 - Procedimiento: ejecutar `QA_CASES=PU-O02 node tests/qa/run.mjs` (PowerShell: `$env:QA_CASES='PU-O02'; node tests/qa/run.mjs`). La implementación exacta está en `tests/qa/cases.mjs`.
-- Resultado esperado/criterio de aprobación: Windows NT 10.0 y fallback cuando falta. Se comprueba mediante assertions; cualquier discrepancia falla el caso.
+- Resultado esperado/criterio de aprobación: Orden de validación correcto; desafío persistido antes de responder y OTP ausente en producción. Se comprueba mediante assertions; cualquier discrepancia falla el caso.
 - Resultado real, estado, evidencia y defecto: véase fila PU-O02 en RESULTADOS_PRUEBAS.md y test-results/qa/results.json.
 
-## PU-P02 — Agente hostil acotado
+## PU-P02 — Autenticación ante denegación y fallo de dependencias
 
 - Categoría: Unitarias; escenario: pésimo.
-- Objetivo/funcionalidad: Agente hostil acotado.
+- Objetivo/funcionalidad: Autenticación ante denegación y fallo de dependencias.
 - Precondiciones: entorno aislado pae_qa iniciado con código de la rama; PostgreSQL y Redis disponibles, excepto durante el fallo inducido descrito. Datos sintéticos nuevos por caso, sin uso de cuentas reales.
-- Entrada: Un millón de paréntesis sin cierre.
+- Entrada: Cuenta bloqueada/desactivada, usuario inexistente, clave incorrecta y fallos de lectura/escritura.
 - Procedimiento: ejecutar `QA_CASES=PU-P02 node tests/qa/run.mjs` (PowerShell: `$env:QA_CASES='PU-P02'; node tests/qa/run.mjs`). La implementación exacta está en `tests/qa/cases.mjs`.
-- Resultado esperado/criterio de aprobación: Fallback sin bloqueo; duración menor a 100ms. Se comprueba mediante assertions; cualquier discrepancia falla el caso.
+- Resultado esperado/criterio de aprobación: Error correcto, respuesta neutra y ninguna sesión completa emitida. Se comprueba mediante assertions; cualquier discrepancia falla el caso.
 - Resultado real, estado, evidencia y defecto: véase fila PU-P02 en RESULTADOS_PRUEBAS.md y test-results/qa/results.json.
 
-## PU-O03 — Regla versionada de premios
+## PU-O03 — Premio con configuración inmutable
 
 - Categoría: Unitarias; escenario: óptimo.
-- Objetivo/funcionalidad: Regla versionada de premios.
+- Objetivo/funcionalidad: Premio con configuración inmutable.
 - Precondiciones: entorno aislado pae_qa iniciado con código de la rama; PostgreSQL y Redis disponibles, excepto durante el fallo inducido descrito. Datos sintéticos nuevos por caso, sin uso de cuentas reales.
-- Entrada: Resultado confirmado v1 y regla de 15 puntos.
+- Entrada: Reglas de 0/15/10000 puntos; configuración externa alterada después de crear consumidor.
 - Procedimiento: ejecutar `QA_CASES=PU-O03 node tests/qa/run.mjs` (PowerShell: `$env:QA_CASES='PU-O03'; node tests/qa/run.mjs`). La implementación exacta está en `tests/qa/cases.mjs`.
-- Resultado esperado/criterio de aprobación: Beneficiario 2, fuente 1, 15 puntos. Se comprueba mediante assertions; cualquier discrepancia falla el caso.
+- Resultado esperado/criterio de aprobación: Beneficiario, origen y versión exactos; la configuración aprobada no cambia ni muta el evento. Se comprueba mediante assertions; cualquier discrepancia falla el caso.
 - Resultado real, estado, evidencia y defecto: véase fila PU-O03 en RESULTADOS_PRUEBAS.md y test-results/qa/results.json.
 
-## PU-P03 — Resultado manipulado por cliente
+## PU-P03 — Contrato antifraude de resultados y reglas
 
 - Categoría: Unitarias; escenario: pésimo.
-- Objetivo/funcionalidad: Resultado manipulado por cliente.
+- Objetivo/funcionalidad: Contrato antifraude de resultados y reglas.
 - Precondiciones: entorno aislado pae_qa iniciado con código de la rama; PostgreSQL y Redis disponibles, excepto durante el fallo inducido descrito. Datos sintéticos nuevos por caso, sin uso de cuentas reales.
-- Entrada: Campo points extra y resultado pendiente.
+- Entrada: Once alteraciones del evento, seis reglas inválidas y resultado pendiente.
 - Procedimiento: ejecutar `QA_CASES=PU-P03 node tests/qa/run.mjs` (PowerShell: `$env:QA_CASES='PU-P03'; node tests/qa/run.mjs`). La implementación exacta está en `tests/qa/cases.mjs`.
-- Resultado esperado/criterio de aprobación: Dominio rechaza evidencia no confirmada. Se comprueba mediante assertions; cualquier discrepancia falla el caso.
+- Resultado esperado/criterio de aprobación: Todos rechazados; ningún premio persistido para evidencia inválida. Se comprueba mediante assertions; cualquier discrepancia falla el caso.
 - Resultado real, estado, evidencia y defecto: véase fila PU-P03 en RESULTADOS_PRUEBAS.md y test-results/qa/results.json.
 
-## PU-O04 — Asignación administrativa de rol
+## PU-O04 — Política administrativa y solicitud docente válida
 
 - Categoría: Unitarias; escenario: óptimo.
-- Objetivo/funcionalidad: Asignación administrativa de rol.
+- Objetivo/funcionalidad: Política administrativa y solicitud docente válida.
 - Precondiciones: entorno aislado pae_qa iniciado con código de la rama; PostgreSQL y Redis disponibles, excepto durante el fallo inducido descrito. Datos sintéticos nuevos por caso, sin uso de cuentas reales.
-- Entrada: Actor admin; destino docente.
+- Entrada: Tres destinos de rol y solicitud institucional normalizada.
 - Procedimiento: ejecutar `QA_CASES=PU-O04 node tests/qa/run.mjs` (PowerShell: `$env:QA_CASES='PU-O04'; node tests/qa/run.mjs`). La implementación exacta está en `tests/qa/cases.mjs`.
-- Resultado esperado/criterio de aprobación: Permitido; alta pública siempre estudiante. Se comprueba mediante assertions; cualquier discrepancia falla el caso.
+- Resultado esperado/criterio de aprobación: Solo admin asigna roles; registro siempre estudiante y solicitud válida admisible. Se comprueba mediante assertions; cualquier discrepancia falla el caso.
 - Resultado real, estado, evidencia y defecto: véase fila PU-O04 en RESULTADOS_PRUEBAS.md y test-results/qa/results.json.
 
-## PU-P04 — Escalada de privilegios
+## PU-P04 — Matriz completa de escalada y roles desconocidos
 
 - Categoría: Unitarias; escenario: pésimo.
-- Objetivo/funcionalidad: Escalada de privilegios.
+- Objetivo/funcionalidad: Matriz completa de escalada y roles desconocidos.
 - Precondiciones: entorno aislado pae_qa iniciado con código de la rama; PostgreSQL y Redis disponibles, excepto durante el fallo inducido descrito. Datos sintéticos nuevos por caso, sin uso de cuentas reales.
-- Entrada: Actor estudiante/docente; destino admin.
+- Entrada: Seis actores no administrativos, tres destinos y entradas inválidas.
 - Procedimiento: ejecutar `QA_CASES=PU-P04 node tests/qa/run.mjs` (PowerShell: `$env:QA_CASES='PU-P04'; node tests/qa/run.mjs`). La implementación exacta está en `tests/qa/cases.mjs`.
-- Resultado esperado/criterio de aprobación: Ambos rechazados. Se comprueba mediante assertions; cualquier discrepancia falla el caso.
+- Resultado esperado/criterio de aprobación: Toda asignación no autorizada y solicitud incompleta se rechaza. Se comprueba mediante assertions; cualquier discrepancia falla el caso.
 - Resultado real, estado, evidencia y defecto: véase fila PU-P04 en RESULTADOS_PRUEBAS.md y test-results/qa/results.json.
 
-## PC-O01 — Lectura con diez sesiones
+## PC-O01 — Carga multiusuario con aislamiento de datos
 
 - Categoría: Carga; escenario: óptimo.
-- Objetivo/funcionalidad: Lectura con diez sesiones.
+- Objetivo/funcionalidad: Carga multiusuario con aislamiento de datos.
 - Precondiciones: entorno aislado pae_qa iniciado con código de la rama; PostgreSQL y Redis disponibles, excepto durante el fallo inducido descrito. Datos sintéticos nuevos por caso, sin uso de cuentas reales.
-- Entrada: 10 cuentas; 40 consultas a preferencias, concurrencia 10.
+- Entrada: 10 sesiones, 80 lecturas de preferencias e identidad con concurrencia 10.
 - Procedimiento: ejecutar `QA_CASES=PC-O01 node tests/qa/run.mjs` (PowerShell: `$env:QA_CASES='PC-O01'; node tests/qa/run.mjs`). La implementación exacta está en `tests/qa/cases.mjs`.
-- Resultado esperado/criterio de aprobación: 40 respuestas 200; p95 <= 5s. Se comprueba mediante assertions; cualquier discrepancia falla el caso.
+- Resultado esperado/criterio de aprobación: Cada respuesta pertenece a su cuenta; preferencias exactas y p95 <= 5s. Se comprueba mediante assertions; cualquier discrepancia falla el caso.
 - Resultado real, estado, evidencia y defecto: véase fila PC-O01 en RESULTADOS_PRUEBAS.md y test-results/qa/results.json.
 
-## PC-P01 — Carga sin credenciales
+## PC-P01 — Carga adversa con credenciales ausentes, falsas y revocadas
 
 - Categoría: Carga; escenario: pésimo.
-- Objetivo/funcionalidad: Carga sin credenciales.
+- Objetivo/funcionalidad: Carga adversa con credenciales ausentes, falsas y revocadas.
 - Precondiciones: entorno aislado pae_qa iniciado con código de la rama; PostgreSQL y Redis disponibles, excepto durante el fallo inducido descrito. Datos sintéticos nuevos por caso, sin uso de cuentas reales.
-- Entrada: 40 consultas protegidas, concurrencia 10.
+- Entrada: 60 lecturas protegidas y comprobación posterior de una sesión válida.
 - Procedimiento: ejecutar `QA_CASES=PC-P01 node tests/qa/run.mjs` (PowerShell: `$env:QA_CASES='PC-P01'; node tests/qa/run.mjs`). La implementación exacta está en `tests/qa/cases.mjs`.
-- Resultado esperado/criterio de aprobación: 40 respuestas 401; ningún dato privado. Se comprueba mediante assertions; cualquier discrepancia falla el caso.
+- Resultado esperado/criterio de aprobación: 401 sin perfil ni preferencias; la sesión válida conserva acceso. Se comprueba mediante assertions; cualquier discrepancia falla el caso.
 - Resultado real, estado, evidencia y defecto: véase fila PC-P01 en RESULTADOS_PRUEBAS.md y test-results/qa/results.json.
 
 ## PC-O02 — Lecturas repetidas de mensajes
@@ -138,24 +138,24 @@ Los fixtures quedan únicamente en el volumen qa-db y se crean con identificador
 - Resultado esperado/criterio de aprobación: 403 en todas sin filtrar mensajes. Se comprueba mediante assertions; cualquier discrepancia falla el caso.
 - Resultado real, estado, evidencia y defecto: véase fila PC-P02 en RESULTADOS_PRUEBAS.md y test-results/qa/results.json.
 
-## PC-O03 — Escrituras concurrentes válidas
+## PC-O03 — Carga de escritura con integridad y autoría
 
 - Categoría: Carga; escenario: óptimo.
-- Objetivo/funcionalidad: Escrituras concurrentes válidas.
+- Objetivo/funcionalidad: Carga de escritura con integridad y autoría.
 - Precondiciones: entorno aislado pae_qa iniciado con código de la rama; PostgreSQL y Redis disponibles, excepto durante el fallo inducido descrito. Datos sintéticos nuevos por caso, sin uso de cuentas reales.
-- Entrada: 12 mensajes distintos; concurrencia 4.
+- Entrada: 24 mensajes distintos, 6 trabajadores y UUID individuales.
 - Procedimiento: ejecutar `QA_CASES=PC-O03 node tests/qa/run.mjs` (PowerShell: `$env:QA_CASES='PC-O03'; node tests/qa/run.mjs`). La implementación exacta está en `tests/qa/cases.mjs`.
-- Resultado esperado/criterio de aprobación: 12 filas distintas persistidas. Se comprueba mediante assertions; cualquier discrepancia falla el caso.
+- Resultado esperado/criterio de aprobación: 24 IDs y contenidos exactos, autores correctos y filas coincidentes en PostgreSQL. Se comprueba mediante assertions; cualquier discrepancia falla el caso.
 - Resultado real, estado, evidencia y defecto: véase fila PC-O03 en RESULTADOS_PRUEBAS.md y test-results/qa/results.json.
 
-## PC-P03 — Escrituras inválidas bajo carga
+## PC-P03 — Carga inválida sin persistencia parcial y recuperación
 
 - Categoría: Carga; escenario: pésimo.
-- Objetivo/funcionalidad: Escrituras inválidas bajo carga.
+- Objetivo/funcionalidad: Carga inválida sin persistencia parcial y recuperación.
 - Precondiciones: entorno aislado pae_qa iniciado con código de la rama; PostgreSQL y Redis disponibles, excepto durante el fallo inducido descrito. Datos sintéticos nuevos por caso, sin uso de cuentas reales.
-- Entrada: 12 mensajes vacíos; concurrencia 4.
+- Entrada: 12 mensajes vacíos seguidos de un mensaje legítimo.
 - Procedimiento: ejecutar `QA_CASES=PC-P03 node tests/qa/run.mjs` (PowerShell: `$env:QA_CASES='PC-P03'; node tests/qa/run.mjs`). La implementación exacta está en `tests/qa/cases.mjs`.
-- Resultado esperado/criterio de aprobación: 400; ninguna fila creada. Se comprueba mediante assertions; cualquier discrepancia falla el caso.
+- Resultado esperado/criterio de aprobación: 400 sin filas residuales; solo el mensaje posterior queda guardado. Se comprueba mediante assertions; cualquier discrepancia falla el caso.
 - Resultado real, estado, evidencia y defecto: véase fila PC-P03 en RESULTADOS_PRUEBAS.md y test-results/qa/results.json.
 
 ## PC-O04 — Tráfico sostenido autorizado
@@ -198,24 +198,24 @@ Los fixtures quedan únicamente en el volumen qa-db y se crean con identificador
 - Resultado esperado/criterio de aprobación: 401 y p95 <= 2s. Se comprueba mediante assertions; cualquier discrepancia falla el caso.
 - Resultado real, estado, evidencia y defecto: véase fila PR-P01 en RESULTADOS_PRUEBAS.md y test-results/qa/results.json.
 
-## PR-O02 — Consulta de historial con índice
+## PR-O02 — Plan de consulta de historial acotado
 
 - Categoría: Rendimiento; escenario: óptimo.
-- Objetivo/funcionalidad: Consulta de historial con índice.
+- Objetivo/funcionalidad: Plan de consulta de historial acotado.
 - Precondiciones: entorno aislado pae_qa iniciado con código de la rama; PostgreSQL y Redis disponibles, excepto durante el fallo inducido descrito. Datos sintéticos nuevos por caso, sin uso de cuentas reales.
-- Entrada: EXPLAIN ANALYZE consulta por comunidad y cursor.
+- Entrada: EXPLAIN ANALYZE de consulta por comunidad con LIMIT 80.
 - Procedimiento: ejecutar `QA_CASES=PR-O02 node tests/qa/run.mjs` (PowerShell: `$env:QA_CASES='PR-O02'; node tests/qa/run.mjs`). La implementación exacta está en `tests/qa/cases.mjs`.
 - Resultado esperado/criterio de aprobación: Plan válido con tiempo de ejecución <= 100ms. Se comprueba mediante assertions; cualquier discrepancia falla el caso.
 - Resultado real, estado, evidencia y defecto: véase fila PR-O02 en RESULTADOS_PRUEBAS.md y test-results/qa/results.json.
 
-## PR-P02 — Consulta sobre historial amplio
+## PR-P02 — Historial amplio paginado sin pérdidas ni filtraciones
 
 - Categoría: Rendimiento; escenario: pésimo.
-- Objetivo/funcionalidad: Consulta sobre historial amplio.
+- Objetivo/funcionalidad: Historial amplio paginado sin pérdidas ni filtraciones.
 - Precondiciones: entorno aislado pae_qa iniciado con código de la rama; PostgreSQL y Redis disponibles, excepto durante el fallo inducido descrito. Datos sintéticos nuevos por caso, sin uso de cuentas reales.
-- Entrada: 500 filas sintéticas en una comunidad; cursor LIMIT 80.
+- Entrada: 500 mensajes, siete páginas con cursor y otro grupo con datos privados.
 - Procedimiento: ejecutar `QA_CASES=PR-P02 node tests/qa/run.mjs` (PowerShell: `$env:QA_CASES='PR-P02'; node tests/qa/run.mjs`). La implementación exacta está en `tests/qa/cases.mjs`.
-- Resultado esperado/criterio de aprobación: Devuelve 80 y plan ejecuta <= 100ms. Se comprueba mediante assertions; cualquier discrepancia falla el caso.
+- Resultado esperado/criterio de aprobación: 500 IDs únicos, sin omisiones ni datos ajenos; p95 HTTP <= 5s y SQL <= 100ms. Se comprueba mediante assertions; cualquier discrepancia falla el caso.
 - Resultado real, estado, evidencia y defecto: véase fila PR-P02 en RESULTADOS_PRUEBAS.md y test-results/qa/results.json.
 
 ## PR-O03 — Carga de interfaz de acceso
@@ -248,34 +248,34 @@ Los fixtures quedan únicamente en el volumen qa-db y se crean con identificador
 - Resultado esperado/criterio de aprobación: 0 errores; métricas CPU/memoria registradas; contenedor activo. Se comprueba mediante assertions; cualquier discrepancia falla el caso.
 - Resultado real, estado, evidencia y defecto: véase fila PR-O04 en RESULTADOS_PRUEBAS.md y test-results/qa/results.json.
 
-## PR-P04 — Recuperación de memoria tras peticiones inválidas
+## PR-P04 — Ráfaga sobredimensionada sin degradación posterior
 
 - Categoría: Rendimiento; escenario: pésimo.
-- Objetivo/funcionalidad: Recuperación de memoria tras peticiones inválidas.
+- Objetivo/funcionalidad: Ráfaga sobredimensionada sin degradación posterior.
 - Precondiciones: entorno aislado pae_qa iniciado con código de la rama; PostgreSQL y Redis disponibles, excepto durante el fallo inducido descrito. Datos sintéticos nuevos por caso, sin uso de cuentas reales.
-- Entrada: 100 JSON de 120KB superiores al límite del parser.
+- Entrada: 20 lecturas base, 100 cuerpos de 120KB y 20 lecturas de recuperación.
 - Procedimiento: ejecutar `QA_CASES=PR-P04 node tests/qa/run.mjs` (PowerShell: `$env:QA_CASES='PR-P04'; node tests/qa/run.mjs`). La implementación exacta está en `tests/qa/cases.mjs`.
-- Resultado esperado/criterio de aprobación: 413 en cada respuesta, sin caída posterior. Se comprueba mediante assertions; cualquier discrepancia falla el caso.
+- Resultado esperado/criterio de aprobación: 100 rechazos 413; identidad intacta; p95 posterior <= máximo de 1s y tres veces el basal. Se comprueba mediante assertions; cualquier discrepancia falla el caso.
 - Resultado real, estado, evidencia y defecto: véase fila PR-P04 en RESULTADOS_PRUEBAS.md y test-results/qa/results.json.
 
-## PN-O01 — Actualizaciones secuenciales con versiones
+## PN-O01 — Ediciones concurrentes independientes sin pérdida
 
 - Categoría: Concurrencia; escenario: óptimo.
-- Objetivo/funcionalidad: Actualizaciones secuenciales con versiones.
+- Objetivo/funcionalidad: Ediciones concurrentes independientes sin pérdida.
 - Precondiciones: entorno aislado pae_qa iniciado con código de la rama; PostgreSQL y Redis disponibles, excepto durante el fallo inducido descrito. Datos sintéticos nuevos por caso, sin uso de cuentas reales.
-- Entrada: Mensaje v1 editado a v2 y v3.
+- Entrada: 8 mensajes distintos actualizados simultáneamente desde v1.
 - Procedimiento: ejecutar `QA_CASES=PN-O01 node tests/qa/run.mjs` (PowerShell: `$env:QA_CASES='PN-O01'; node tests/qa/run.mjs`). La implementación exacta está en `tests/qa/cases.mjs`.
-- Resultado esperado/criterio de aprobación: Contenido final coincide y version=3. Se comprueba mediante assertions; cualquier discrepancia falla el caso.
+- Resultado esperado/criterio de aprobación: Todas 200, contenido exacto por ID y versión 2 sin afectar otras filas. Se comprueba mediante assertions; cualquier discrepancia falla el caso.
 - Resultado real, estado, evidencia y defecto: véase fila PN-O01 en RESULTADOS_PRUEBAS.md y test-results/qa/results.json.
 
-## PN-P01 — Edición simultánea conflictiva
+## PN-P01 — Ocho escritores sobre una misma versión
 
 - Categoría: Concurrencia; escenario: pésimo.
-- Objetivo/funcionalidad: Edición simultánea conflictiva.
+- Objetivo/funcionalidad: Ocho escritores sobre una misma versión.
 - Precondiciones: entorno aislado pae_qa iniciado con código de la rama; PostgreSQL y Redis disponibles, excepto durante el fallo inducido descrito. Datos sintéticos nuevos por caso, sin uso de cuentas reales.
-- Entrada: Dos ediciones de la misma versión.
+- Entrada: 8 PATCH simultáneos con contenidos distintos y versión 1.
 - Procedimiento: ejecutar `QA_CASES=PN-P01 node tests/qa/run.mjs` (PowerShell: `$env:QA_CASES='PN-P01'; node tests/qa/run.mjs`). La implementación exacta está en `tests/qa/cases.mjs`.
-- Resultado esperado/criterio de aprobación: Una 200, una 409; versión final 2. Se comprueba mediante assertions; cualquier discrepancia falla el caso.
+- Resultado esperado/criterio de aprobación: Exactamente un ganador, siete 409; BD coincide con el ganador y versión 2. Se comprueba mediante assertions; cualquier discrepancia falla el caso.
 - Resultado real, estado, evidencia y defecto: véase fila PN-P01 en RESULTADOS_PRUEBAS.md y test-results/qa/results.json.
 
 ## PN-O02 — Solicitudes independientes simultáneas
@@ -458,14 +458,14 @@ Los fixtures quedan únicamente en el volumen qa-db y se crean con identificador
 - Resultado esperado/criterio de aprobación: Mensaje de error, no sesión ni navegación protegida. Se comprueba mediante assertions; cualquier discrepancia falla el caso.
 - Resultado real, estado, evidencia y defecto: véase fila PS-P02 en RESULTADOS_PRUEBAS.md y test-results/qa/results.json.
 
-## PS-O03 — Navegación de funcionalidades integradas
+## PS-O03 — Consulta académica respondida y resuelta desde interfaz
 
 - Categoría: Sistema; escenario: óptimo.
-- Objetivo/funcionalidad: Navegación de funcionalidades integradas.
+- Objetivo/funcionalidad: Consulta académica respondida y resuelta desde interfaz.
 - Precondiciones: entorno aislado pae_qa iniciado con código de la rama; PostgreSQL y Redis disponibles, excepto durante el fallo inducido descrito. Datos sintéticos nuevos por caso, sin uso de cuentas reales.
-- Entrada: Sesión estudiante visita foros y gamificación.
+- Entrada: Alumno con consulta, respuesta de docente y resolución desde navegador.
 - Procedimiento: ejecutar `QA_CASES=PS-O03 node tests/qa/run.mjs` (PowerShell: `$env:QA_CASES='PS-O03'; node tests/qa/run.mjs`). La implementación exacta está en `tests/qa/cases.mjs`.
-- Resultado esperado/criterio de aprobación: Ambas páginas muestran su encabezado y no errores de página. Se comprueba mediante assertions; cualquier discrepancia falla el caso.
+- Resultado esperado/criterio de aprobación: Respuesta visible, cierre persistente tras recarga, API coherente y cero errores de página. Se comprueba mediante assertions; cualquier discrepancia falla el caso.
 - Resultado real, estado, evidencia y defecto: véase fila PS-O03 en RESULTADOS_PRUEBAS.md y test-results/qa/results.json.
 
 ## PS-P03 — Formulario de publicación vacío

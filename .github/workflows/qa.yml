@@ -64,6 +64,7 @@ jobs:
           done
       - run: npx playwright install --with-deps chromium
       - run: npm run test:coverage
+      - run: node tests/qa/mutation-probes.mjs
       - run: npm ci --ignore-scripts --prefix frontend
       - run: node scripts/frontend-coverage.mjs
       - run: npm run qa:up
