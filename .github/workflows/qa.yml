@@ -124,6 +124,41 @@ jobs:
         with:
           args: >-
             -Dsonar.qualitygate.wait=true
+      - name: Verify main global coverage above 80 percent
+        if: success() && github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN || secrets.PAESOFTK }}
+        run: |
+          mkdir -p test-results/sonar
+          curl --fail --silent --show-error --retry 3 \
+            -H "Authorization: Bearer $SONAR_TOKEN" \
+            'https://sonarcloud.io/api/project_analyses/search?project=JaqzO8_PAE-Software&branch=main&ps=1' \
+            -o test-results/sonar/analysis.json
+          curl --fail --silent --show-error --retry 3 \
+            -H "Authorization: Bearer $SONAR_TOKEN" \
+            'https://sonarcloud.io/api/measures/component?component=JaqzO8_PAE-Software&branch=main&metricKeys=coverage,new_coverage,alert_status' \
+            -o test-results/sonar/measures.json
+          node <<'NODE'
+          const assert = require('node:assert/strict');
+          const fs = require('node:fs');
+          const latest = JSON.parse(fs.readFileSync('test-results/sonar/analysis.json', 'utf8')).analyses?.[0];
+          assert.equal(latest?.revision, process.env.GITHUB_SHA, 'Sonar must report the current commit');
+          const report = JSON.parse(fs.readFileSync('test-results/sonar/measures.json', 'utf8'));
+          const measures = Object.fromEntries(report.component.measures.map(m => [m.metric, m.value ?? m.period?.value]));
+          const coverage = Number(measures.coverage);
+          assert.ok(Number.isFinite(coverage) && coverage > 80, `Global coverage must exceed 80%; received ${measures.coverage}`);
+          assert.equal(measures.alert_status, 'OK', 'Quality Gate must pass');
+          const summary = `Sonar main ${latest.revision}: global coverage ${coverage}%; Quality Gate OK.\n`;
+          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, summary);
+          console.log(summary);
+          NODE
+      - name: Save main Sonar verification
+        if: always() && github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: sonar-main-verification
+          path: test-results/sonar/
+          if-no-files-found: warn
       - name: Explain branch analysis availability
         if: success() && github.event_name != 'pull_request' && github.ref != 'refs/heads/main'
         run: echo "::notice::This Sonar organization does not support non-main branch gates. Tests and coverage ran; see PR and main analyses for Sonar results. No branch gate is claimed."
